@@ -4,9 +4,22 @@ const sql = require('mssql');
 
 const app = express();
 
-app.use(cors({
-    origin: 'https://food-security-front.azurewebsites.net', // Allow only your frontend domain
-    credentials: true
+const allowedOrigins = [
+    'http://localhost:3000',
+    'https://food-security-front.azurewebsites.net'
+  ];
+
+  app.use(cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (e.g., mobile apps, Postman)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,  // Allow credentials (cookies, authorization headers, etc.)
   }));
   
 app.use(express.json());
