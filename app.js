@@ -4,7 +4,11 @@ const sql = require('mssql');
 
 const app = express();
 
-app.use(cors()); // To allow cross-origin requests from the React app
+app.use(cors({
+    origin: 'https://food-security-front.azurewebsites.net', // Allow only your frontend domain
+    credentials: true
+  }));
+  
 app.use(express.json());
 
 const config = {
@@ -256,7 +260,7 @@ app.get('/dashboard-responses', async (req, res) => {
     }
 });
 
-
+const apiUrl = process.env.REACT_APP_API_URL || 'https://food-security-back.azurewebsites.net';
 
 const port = process.env.PORT || 5001;
 app.listen(port, () => {
