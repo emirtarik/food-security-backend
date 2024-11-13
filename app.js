@@ -201,7 +201,15 @@ app.get('/responses', async (req, res) => {
 
         if (submissions.length > 0) {
             const submission = submissions[0]; // Expecting one submission per role
-            const indexedResponses = JSON.parse(submission.responses);
+            
+            // Parse the 'responses' JSON string
+            let indexedResponses = {};
+            try {
+                indexedResponses = JSON.parse(submission.responses);
+            } catch (parseError) {
+                console.error('Error parsing responses JSON:', parseError);
+                return res.status(500).send('Error parsing responses data');
+            }
 
             // Creating structured data from indexed responses
             const structuredResponses = {};
@@ -224,7 +232,32 @@ app.get('/responses', async (req, res) => {
                 });
             });
 
-            res.json(structuredResponses);
+            // Parse 'actionPlan' if it's stored as a JSON string
+            let parsedActionPlan = [];
+            if (submission.actionPlan) {
+                try {
+                    parsedActionPlan = JSON.parse(submission.actionPlan);
+                } catch (parseError) {
+                    console.error('Error parsing actionPlan JSON:', parseError);
+                    // Optionally handle the error or set to an empty array
+                    parsedActionPlan = [];
+                }
+            }
+
+            // Construct the full response object
+            const responseData = {
+                responses: structuredResponses,
+                submitted: submission.submitted, // Assuming 'submitted' is a boolean
+                comments: submission.comments || '',
+                performanceScore: submission.performanceScore || 0,
+                financingNeed: submission.financingNeed || 0,
+                financingMobilized: submission.financingMobilized || 0,
+                actionPlan: parsedActionPlan
+            };
+
+            console.log('Sending response data:', responseData); // Debugging
+
+            res.json(responseData);
         } else {
             res.status(200).json({}); // No submission found
         }
