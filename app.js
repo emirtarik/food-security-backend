@@ -67,14 +67,29 @@ app.post('/login', async (req, res) => {
 
 // POST route to store or update the questionnaire responses
 app.post('/submit', async (req, res) => {
-    const { country, role, year, month, responses, comments, questionComments, performanceScore, financingNeed, financingMobilized, actionPlan, submitted } = req.body;
+    const {
+        country,
+        role,
+        year,
+        month,
+        responses,
+        comments,
+        questionComments,
+        performanceScore,
+        financingNeed,
+        financingMobilized,
+        actionPlanPerQuestion,
+        savedActionPlans,
+        submitted,
+    } = req.body;
 
     console.log('Received submission for country:', country);
     console.log('Received submission for role:', role);
     console.log('Received year:', year);
     console.log('Received month:', month);
     console.log('Submitted status:', submitted);
-    console.log('Action Plan:', actionPlan); // Log the action plan data
+    console.log('Action Plan Per Question:', actionPlanPerQuestion); // Log the action plan data
+    console.log('Saved Action Plans:', savedActionPlans); // Log saved action plans
 
     try {
         const pool = await sql.connect(config);
@@ -92,20 +107,29 @@ app.post('/submit', async (req, res) => {
             await pool.request()
                 .input('responses', sql.NVarChar, JSON.stringify(responses))
                 .input('comments', sql.NVarChar, comments)
-                .input('questionComments', sql.NVarChar, JSON.stringify(questionComments)) // Add question-specific comments
+                .input('questionComments', sql.NVarChar, JSON.stringify(questionComments))
                 .input('performanceScore', sql.VarChar, performanceScore)
                 .input('financingNeed', sql.VarChar, financingNeed)
                 .input('financingMobilized', sql.VarChar, financingMobilized)
-                .input('actionPlan', sql.NVarChar, JSON.stringify(actionPlan)) // Add the action plan to the query
-                .input('submitted', sql.Bit, submitted) // Update submitted status
+                .input('actionPlanPerQuestion', sql.NVarChar, JSON.stringify(actionPlanPerQuestion))
+                .input('savedActionPlans', sql.NVarChar, JSON.stringify(savedActionPlans))
+                .input('submitted', sql.Bit, submitted)
                 .input('country', sql.VarChar, country)
                 .input('role', sql.VarChar, role)
                 .input('year', sql.VarChar, year)
                 .input('month', sql.VarChar, month)
                 .query(`
                     UPDATE Submissions 
-                    SET responses = @responses, comments = @comments, questionComments = @questionComments, performanceScore = @performanceScore, 
-                        financingNeed = @financingNeed, financingMobilized = @financingMobilized, actionPlan = @actionPlan, submitted = @submitted
+                    SET 
+                        responses = @responses, 
+                        comments = @comments, 
+                        questionComments = @questionComments, 
+                        performanceScore = @performanceScore, 
+                        financingNeed = @financingNeed, 
+                        financingMobilized = @financingMobilized, 
+                        actionPlanPerQuestion = @actionPlanPerQuestion,
+                        savedActionPlans = @savedActionPlans,
+                        submitted = @submitted
                     WHERE country = @country AND role = @role AND year = @year AND month = @month
                 `);
         } else {
@@ -117,15 +141,18 @@ app.post('/submit', async (req, res) => {
                 .input('month', sql.VarChar, month)
                 .input('responses', sql.NVarChar, JSON.stringify(responses))
                 .input('comments', sql.NVarChar, comments)
-                .input('questionComments', sql.NVarChar, JSON.stringify(questionComments)) // Insert question-specific comments
+                .input('questionComments', sql.NVarChar, JSON.stringify(questionComments))
                 .input('performanceScore', sql.VarChar, performanceScore)
                 .input('financingNeed', sql.VarChar, financingNeed)
                 .input('financingMobilized', sql.VarChar, financingMobilized)
-                .input('actionPlan', sql.NVarChar, JSON.stringify(actionPlan)) // Insert the action plan
-                .input('submitted', sql.Bit, submitted) // Insert submitted status
+                .input('actionPlanPerQuestion', sql.NVarChar, JSON.stringify(actionPlanPerQuestion))
+                .input('savedActionPlans', sql.NVarChar, JSON.stringify(savedActionPlans))
+                .input('submitted', sql.Bit, submitted)
                 .query(`
-                    INSERT INTO Submissions (country, role, year, month, responses, comments, questionComments, performanceScore, financingNeed, financingMobilized, actionPlan, submitted)
-                    VALUES (@country, @role, @year, @month, @responses, @comments, @questionComments, @performanceScore, @financingNeed, @financingMobilized, @actionPlan, @submitted)
+                    INSERT INTO Submissions 
+                        (country, role, year, month, responses, comments, questionComments, performanceScore, financingNeed, financingMobilized, actionPlanPerQuestion, savedActionPlans, submitted)
+                    VALUES 
+                        (@country, @role, @year, @month, @responses, @comments, @questionComments, @performanceScore, @financingNeed, @financingMobilized, @actionPlanPerQuestion, @savedActionPlans, @submitted)
                 `);
         }
 
