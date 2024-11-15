@@ -310,28 +310,57 @@ app.get('/dashboard-responses', async (req, res) => {
         const submissions = result.recordset;
 
         if (submissions.length > 0) {
-            // Combine only the responses from different roles using the index
+            // Aggregate responses from all submissions
             const cumulativeResponses = submissions.reduce((acc, submission) => {
                 const parsedResponses = JSON.parse(submission.responses);
                 return {
                     ...acc,
-                    ...parsedResponses // Merge responses using indices
+                    ...parsedResponses // Merge responses using question indices
                 };
             }, {});
 
-            console.log('Sending back indexed responses for the dashboard:', cumulativeResponses);
+            // Aggregate savedActionPlans from all submissions
+            const cumulativeSavedActionPlans = submissions.reduce((acc, submission) => {
+                const parsedSavedActionPlans = JSON.parse(submission.savedActionPlans || '{}');
+                // Iterate through each question's saved action plans
+                for (const [questionKey, plans] of Object.entries(parsedSavedActionPlans)) {
+                    if (!acc[questionKey]) {
+                        acc[questionKey] = [];
+                    }
+                    acc[questionKey].push(...plans);
+                }
+                return acc;
+            }, {});
+
+            // Optionally, aggregate actionPlanPerQuestion if needed
+            const cumulativeActionPlanPerQuestion = submissions.reduce((acc, submission) => {
+                const parsedActionPlan = JSON.parse(submission.actionPlanPerQuestion || '{}');
+                for (const [questionKey, plans] of Object.entries(parsedActionPlan)) {
+                    if (!acc[questionKey]) {
+                        acc[questionKey] = [];
+                    }
+                    acc[questionKey].push(...plans);
+                }
+                return acc;
+            }, {});
+
+            console.log('Sending back data for the dashboard:', { cumulativeResponses, cumulativeSavedActionPlans });
+
             res.json({
-                responses: cumulativeResponses
+                responses: cumulativeResponses,
+                savedActionPlans: cumulativeSavedActionPlans,
+                // actionPlanPerQuestion: cumulativeActionPlanPerQuestion, // Uncomment if needed
             });
         } else {
             console.log(`No submissions found for ${country} - ${year} - ${month}`);
-            res.status(200).json({}); // Respond with an empty object instead of 404
+            res.status(200).json({ responses: {}, savedActionPlans: {} }); // Respond with empty objects
         }
     } catch (error) {
         console.error('Error fetching dashboard responses:', error);
         res.status(500).send('Error fetching dashboard responses');
     }
 });
+
 
 const apiUrl = process.env.REACT_APP_API_URL || 'https://food-security-back.azurewebsites.net';
 
