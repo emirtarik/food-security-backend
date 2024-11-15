@@ -208,8 +208,7 @@ app.get('/available-months', async (req, res) => {
   }
 });
 
-// In app.js
-
+// Updated /responses route for master user functionality
 app.get('/responses', async (req, res) => {
     const { country, year, month, role } = req.query; // Include role in the query params
 
@@ -228,38 +227,41 @@ app.get('/responses', async (req, res) => {
 
         if (submissions.length > 0) {
             const submission = submissions[0]; // Expecting one submission per role
-            
-            // Parse the 'responses' JSON string
-            let indexedResponses = {};
+
+            // Parse the 'responses' JSON string (assuming it's already flat)
+            let parsedResponses = {};
             try {
-                indexedResponses = JSON.parse(submission.responses);
+                parsedResponses = JSON.parse(submission.responses);
             } catch (parseError) {
                 console.error('Error parsing responses JSON:', parseError);
                 return res.status(500).send('Error parsing responses data');
             }
 
-            // Creating structured data from indexed responses
-            const structuredResponses = {};
-            Object.keys(indexedResponses).forEach(index => {
-                const sectionNumber = index[0];
-                const subsectionNumber = index[1];
-                const questionNumber = index[2];
-                
-                if (!structuredResponses[sectionNumber]) {
-                    structuredResponses[sectionNumber] = {};
+            // Parse 'actionPlanPerQuestion' if it's stored as a JSON string
+            let parsedActionPlanPerQuestion = {};
+            if (submission.actionPlanPerQuestion) {
+                try {
+                    parsedActionPlanPerQuestion = JSON.parse(submission.actionPlanPerQuestion);
+                } catch (parseError) {
+                    console.error('Error parsing actionPlanPerQuestion JSON:', parseError);
+                    // Optionally handle the error or set to an empty object
+                    parsedActionPlanPerQuestion = {};
                 }
-                
-                if (!structuredResponses[sectionNumber][subsectionNumber]) {
-                    structuredResponses[sectionNumber][subsectionNumber] = [];
-                }
-                
-                structuredResponses[sectionNumber][subsectionNumber].push({
-                    questionNumber,
-                    score: indexedResponses[index]
-                });
-            });
+            }
 
-            // Parse 'actionPlan' if it's stored as a JSON string
+            // Parse 'savedActionPlans' if it's stored as a JSON string
+            let parsedSavedActionPlans = {};
+            if (submission.savedActionPlans) {
+                try {
+                    parsedSavedActionPlans = JSON.parse(submission.savedActionPlans);
+                } catch (parseError) {
+                    console.error('Error parsing savedActionPlans JSON:', parseError);
+                    // Optionally handle the error or set to an empty object
+                    parsedSavedActionPlans = {};
+                }
+            }
+
+            // Parse 'actionPlan' if it's stored as a JSON string (optional, based on your needs)
             let parsedActionPlan = [];
             if (submission.actionPlan) {
                 try {
@@ -273,13 +275,15 @@ app.get('/responses', async (req, res) => {
 
             // Construct the full response object
             const responseData = {
-                responses: structuredResponses,
+                responses: parsedResponses, // Flat object mapping question keys to scores
                 submitted: submission.submitted, // Assuming 'submitted' is a boolean
                 comments: submission.comments || '',
                 performanceScore: submission.performanceScore || 0,
                 financingNeed: submission.financingNeed || 0,
                 financingMobilized: submission.financingMobilized || 0,
-                actionPlan: parsedActionPlan
+                actionPlanPerQuestion: parsedActionPlanPerQuestion, // Parsed per-question action plans
+                savedActionPlans: parsedSavedActionPlans, // Parsed saved action plans
+                actionPlan: parsedActionPlan, // Optional: If you need to include this
             };
 
             console.log('Sending response data:', responseData); // Debugging
