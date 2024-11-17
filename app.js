@@ -36,21 +36,21 @@ const config = {
     }
 };
 
-// Middleware for verifying master role
-const verifyMasterRole = (req, res, next) => {
-    if (req.user) {
-        console.log(`User role: ${req.user.role}`);
-        if (req.user.role === 'master') {
-            next();
-        } else {
-            console.log('User is not a master');
-            res.status(403).json({ message: 'Forbidden: Insufficient permissions' });
-        }
-    } else {
-        console.log('No user found in request');
-        res.status(403).json({ message: 'Forbidden: No user information' });
-    }
-};
+// Middleware for verifying master role / to be implemented later
+// const verifyMasterRole = (req, res, next) => {
+//     if (req.user) {
+//         console.log(`User role: ${req.user.role}`);
+//         if (req.user.role === 'master') {
+//             next();
+//         } else {
+//             console.log('User is not a master');
+//             res.status(403).json({ message: 'Forbidden: Insufficient permissions' });
+//         }
+//     } else {
+//         console.log('No user found in request');
+//         res.status(403).json({ message: 'Forbidden: No user information' });
+//     }
+// };
 
 // Login route: authenticate users based on MSSQL Users table
 app.post('/login', async (req, res) => {
@@ -314,8 +314,7 @@ app.get('/responses', async (req, res) => {
     }
 });
 
-// 6. Master Responses Route: Get aggregated responses for master user
-app.get('/master-responses', verifyMasterRole, async (req, res) => {
+app.get('/master-responses', async (req, res) => {
     const { country, year, month } = req.query;
 
     if (!country || !year || !month) {
@@ -402,6 +401,8 @@ app.get('/master-responses', verifyMasterRole, async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
+
+
 app.get('/dashboard-responses', async (req, res) => {
     const { country, year, month } = req.query; // No need for role in the dashboard
 
