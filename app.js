@@ -38,14 +38,17 @@ const config = {
 
 // Middleware for verifying master role
 const verifyMasterRole = (req, res, next) => {
-    // TODO: Implement authentication middleware that sets req.user
-    // For example, using JWT and setting req.user based on the token
-    // Ensure that req.user is populated before this middleware runs
-
-    if (req.user && req.user.role === 'master') {
-        next();
+    if (req.user) {
+        console.log(`User role: ${req.user.role}`);
+        if (req.user.role === 'master') {
+            next();
+        } else {
+            console.log('User is not a master');
+            res.status(403).json({ message: 'Forbidden: Insufficient permissions' });
+        }
     } else {
-        res.status(403).json({ error: 'Access denied. Master role required.' });
+        console.log('No user found in request');
+        res.status(403).json({ message: 'Forbidden: No user information' });
     }
 };
 
