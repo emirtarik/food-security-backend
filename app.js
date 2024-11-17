@@ -1,46 +1,71 @@
+// app.js
+
 const express = require('express');
 const cors = require('cors');
 const sql = require('mssql');
+const dotenv = require('dotenv');
+
+dotenv.config(); // Load environment variables from .env file
 
 const app = express();
 
+// CORS Configuration
 const allowedOrigins = [
     'http://localhost:3000',
     'https://food-security-front.azurewebsites.net'
-  ];
+];
 
-  app.use(cors({
+app.use(cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (e.g., mobile apps, Postman)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
+        // Allow requests with no origin (e.g., mobile apps, Postman)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
     },
     credentials: true,  // Allow credentials (cookies, authorization headers, etc.)
-  }));
-  
+}));
+
+// JSON Parsing Middleware
 app.use(express.json());
 
+// Database Configuration
 const config = {
-    user: 'admin',  // Replace with your RDS master username
-    password: 'XEqbUunu1P0vTyJH873y',  // Replace with your RDS master user password
-    server: 'food-security-backend.cf6smoo0edix.eu-north-1.rds.amazonaws.com',  // Your AWS RDS endpoint
-    database: 'backend',  // The name of your database in RDS
-    port: 1433,
+    user: process.env.DB_USER || 'admin',  // Replace with your RDS master username
+    password: process.env.DB_PASSWORD || 'XEqbUunu1P0vTyJH873y',  // Replace with your RDS master user password
+    server: process.env.DB_SERVER || 'food-security-backend.cf6smoo0edix.eu-north-1.rds.amazonaws.com',  // Your AWS RDS endpoint
+    database: process.env.DB_DATABASE || 'backend',  // The name of your database in RDS
+    port: parseInt(process.env.DB_PORT, 10) || 1433,
     options: {
         encrypt: true,  // Required for AWS RDS
         trustServerCertificate: true  // Recommended for production environments
     }
 };
 
-// Login route: authenticate users based on MSSQL Users table
+// Middleware for verifying master role
+const verifyMasterRole = (req, res, next) => {
+    // TODO: Implement authentication middleware that sets req.user
+    // For example, using JWT and setting req.user based on the token
+    // Ensure that req.user is populated before this middleware runs
+
+    if (req.user && req.user.role === 'master') {
+        next();
+    } else {
+        res.status(403).json({ error: 'Access denied. Master role required.' });
+    }
+};
+
+// -----------------------------------
+// Routes
+// -----------------------------------
+
+// 1. Login Route: Authenticate users based on MSSQL Users table
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
 
-    console.log(`Received login request for username: ${username} and password: ${password}`);
+    console.log(`Received login request for username: ${username}`);
 
     try {
         const pool = await sql.connect(config);
@@ -50,13 +75,23 @@ app.post('/login', async (req, res) => {
 
         const user = result.recordset[0];
 
-        console.log(`User found in database: ${user}`);
+        if (user) {
+            // TODO: Implement password hashing comparison
+            // Example using bcrypt:
+            // const bcrypt = require('bcrypt');
+            // const isPasswordValid = await bcrypt.compare(password, user.password);
+            // if (isPasswordValid) { ... }
 
-        if (user && user.password === password) {  // In production, compare hashed passwords
-            console.log('Login successful, sending country and role to client');
-            res.status(200).json({ message: 'Login successful', country: user.country, role: user.role });
+            if (user.password === password) {  // In production, compare hashed passwords
+                console.log('Login successful, sending country and role to client');
+                // TODO: Generate and send a JWT token for authenticated sessions
+                res.status(200).json({ message: 'Login successful', country: user.country, role: user.role });
+            } else {
+                console.log('Login failed: Invalid credentials');
+                res.status(401).json({ message: 'Invalid credentials' });
+            }
         } else {
-            console.log('Login failed: Invalid credentials');
+            console.log('Login failed: User not found');
             res.status(401).json({ message: 'Invalid credentials' });
         }
     } catch (error) {
@@ -65,7 +100,7 @@ app.post('/login', async (req, res) => {
     }
 });
 
-// POST route to store or update the questionnaire responses
+// 2. Submit Route: Store or update the questionnaire responses
 app.post('/submit', async (req, res) => {
     const {
         country,
@@ -83,13 +118,7 @@ app.post('/submit', async (req, res) => {
         submitted,
     } = req.body;
 
-    console.log('Received submission for country:', country);
-    console.log('Received submission for role:', role);
-    console.log('Received year:', year);
-    console.log('Received month:', month);
-    console.log('Submitted status:', submitted);
-    console.log('Action Plan Per Question:', actionPlanPerQuestion); // Log the action plan data
-    console.log('Saved Action Plans:', savedActionPlans); // Log saved action plans
+    console.log(`Received submission for country: ${country}, role: ${role}, year: ${year}, month: ${month}, submitted: ${submitted}`);
 
     try {
         const pool = await sql.connect(config);
@@ -164,55 +193,62 @@ app.post('/submit', async (req, res) => {
     }
 });
 
+// 3. Available Countries Route: Get distinct countries from Submissions
 app.get('/available-countries', async (req, res) => {
     try {
-      const pool = await sql.connect(config);
-  
-      const result = await pool.request()
-        .query(`
-          SELECT DISTINCT country 
-          FROM Submissions
-        `);
-  
-      const countries = result.recordset.map(row => row.country);
-      res.json(countries);
+        const pool = await sql.connect(config);
+
+        const result = await pool.request()
+            .query(`
+                SELECT DISTINCT country 
+                FROM Submissions
+            `);
+
+        const countries = result.recordset.map(row => row.country);
+        res.json(countries);
     } catch (error) {
-      console.error('Error fetching available countries:', error);
-      res.status(500).send('Internal Server Error');
+        console.error('Error fetching available countries:', error);
+        res.status(500).send('Internal Server Error');
     }
-  });
-  
-  
-
-// Example backend route to return available months for a given year and country
-app.get('/available-months', async (req, res) => {
-  const { country, year } = req.query;
-
-  try {
-    const pool = await sql.connect(config);
-
-    const result = await pool.request()
-      .input('country', sql.VarChar, country)
-      .input('year', sql.VarChar, year)
-      .query(`
-        SELECT DISTINCT month 
-        FROM Submissions 
-        WHERE country = @country AND year = @year
-      `);
-
-    const months = result.recordset.map(row => row.month);
-    res.json(months);
-  } catch (error) {
-    console.error('Error fetching available months:', error);
-    res.status(500).send('Error fetching available months');
-  }
 });
 
-// Updated /responses route for master user functionality
+// 4. Available Months Route: Get distinct months for a given country and year
+app.get('/available-months', async (req, res) => {
+    const { country, year } = req.query;
+
+    if (!country || !year) {
+        return res.status(400).json({ error: 'country and year are required' });
+    }
+
+    try {
+        const pool = await sql.connect(config);
+
+        const result = await pool.request()
+            .input('country', sql.VarChar, country)
+            .input('year', sql.VarChar, year)
+            .query(`
+                SELECT DISTINCT month 
+                FROM Submissions 
+                WHERE country = @country AND year = @year
+            `);
+
+        const months = result.recordset.map(row => row.month);
+        res.json(months);
+    } catch (error) {
+        console.error('Error fetching available months:', error);
+        res.status(500).send('Error fetching available months');
+    }
+});
+
+// 5. Responses Route: Get responses based on country, year, month, and role
 app.get('/responses', async (req, res) => {
     const { country, year, month, role } = req.query; // Include role in the query params
 
-    console.log('Received request with:', { country, year, month, role });
+    if (!country || !year || !month || !role) {
+        return res.status(400).json({ error: 'country, year, month, and role are required' });
+    }
+
+    console.log('Received /responses request with:', { country, year, month, role });
 
     try {
         const pool = await sql.connect(config);
@@ -220,7 +256,7 @@ app.get('/responses', async (req, res) => {
             .input('country', sql.VarChar, country)
             .input('year', sql.VarChar, year)
             .input('month', sql.VarChar, month)
-            .input('role', sql.VarChar, role) // Ensure we filter by role
+            .input('role', sql.VarChar, role)
             .query('SELECT * FROM Submissions WHERE country = @country AND year = @year AND month = @month AND role = @role');
 
         const submissions = result.recordset;
@@ -228,7 +264,7 @@ app.get('/responses', async (req, res) => {
         if (submissions.length > 0) {
             const submission = submissions[0]; // Expecting one submission per role
 
-            // Parse the 'responses' JSON string (assuming it's already flat)
+            // Parse the 'responses' JSON string
             let parsedResponses = {};
             try {
                 parsedResponses = JSON.parse(submission.responses);
@@ -244,7 +280,6 @@ app.get('/responses', async (req, res) => {
                     parsedActionPlanPerQuestion = JSON.parse(submission.actionPlanPerQuestion);
                 } catch (parseError) {
                     console.error('Error parsing actionPlanPerQuestion JSON:', parseError);
-                    // Optionally handle the error or set to an empty object
                     parsedActionPlanPerQuestion = {};
                 }
             }
@@ -256,20 +291,7 @@ app.get('/responses', async (req, res) => {
                     parsedSavedActionPlans = JSON.parse(submission.savedActionPlans);
                 } catch (parseError) {
                     console.error('Error parsing savedActionPlans JSON:', parseError);
-                    // Optionally handle the error or set to an empty object
                     parsedSavedActionPlans = {};
-                }
-            }
-
-            // Parse 'actionPlan' if it's stored as a JSON string (optional, based on your needs)
-            let parsedActionPlan = [];
-            if (submission.actionPlan) {
-                try {
-                    parsedActionPlan = JSON.parse(submission.actionPlan);
-                } catch (parseError) {
-                    console.error('Error parsing actionPlan JSON:', parseError);
-                    // Optionally handle the error or set to an empty array
-                    parsedActionPlan = [];
                 }
             }
 
@@ -283,10 +305,10 @@ app.get('/responses', async (req, res) => {
                 financingMobilized: submission.financingMobilized || 0,
                 actionPlanPerQuestion: parsedActionPlanPerQuestion, // Parsed per-question action plans
                 savedActionPlans: parsedSavedActionPlans, // Parsed saved action plans
-                actionPlan: parsedActionPlan, // Optional: If you need to include this
+                // actionPlan: parsedActionPlan, // Optional: If you need to include this
             };
 
-            console.log('Sending response data:', responseData); // Debugging
+            console.log('Sending /responses data:', responseData);
 
             res.json(responseData);
         } else {
@@ -298,10 +320,100 @@ app.get('/responses', async (req, res) => {
     }
 });
 
+// 6. Master Responses Route: Get aggregated responses for master user
+app.get('/master-responses', verifyMasterRole, async (req, res) => {
+    const { country, year, month } = req.query;
+
+    if (!country || !year || !month) {
+        return res.status(400).json({ error: 'country, year, and month are required' });
+    }
+
+    console.log('Received /master-responses request with:', { country, year, month });
+
+    try {
+        const pool = await sql.connect(config);
+
+        // Fetch submissions for all roles matching country, year, and month
+        const result = await pool.request()
+            .input('country', sql.VarChar, country)
+            .input('year', sql.VarChar, year)
+            .input('month', sql.VarChar, month)
+            .query(`
+                SELECT * FROM Submissions 
+                WHERE country = @country 
+                  AND year = @year 
+                  AND month = @month
+                  AND role IN ('section1', 'section2', 'section3', 'section4')
+            `);
+
+        const submissions = result.recordset;
+
+        if (submissions.length > 0) {
+            // Initialize aggregation objects
+            const aggregatedData = {
+                section1: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
+                section2: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
+                section3: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
+                section4: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
+            };
+
+            submissions.forEach(submission => {
+                const role = submission.role; // e.g., 'section1'
+                if (aggregatedData[role]) {
+                    const responses = JSON.parse(submission.responses || '{}');
+                    const comments = JSON.parse(submission.comments || '{}');
+                    const actionPlans = JSON.parse(submission.actionPlanPerQuestion || '{}');
+                    const savedActionPlans = JSON.parse(submission.savedActionPlans || '{}');
+
+                    // Aggregate responses
+                    aggregatedData[role].responses = {
+                        ...aggregatedData[role].responses,
+                        ...responses, // Merge responses by question index
+                    };
+
+                    // Aggregate comments
+                    aggregatedData[role].comments = {
+                        ...aggregatedData[role].comments,
+                        ...comments,
+                    };
+
+                    // Aggregate action plans
+                    aggregatedData[role].actionPlans = {
+                        ...aggregatedData[role].actionPlans,
+                        ...actionPlans,
+                    };
+
+                    // Aggregate saved action plans
+                    aggregatedData[role].savedActionPlans = {
+                        ...aggregatedData[role].savedActionPlans,
+                        ...savedActionPlans,
+                    };
+                }
+            });
+
+            console.log('Sending back master responses:', aggregatedData);
+
+            res.json(aggregatedData);
+        } else {
+            console.log(`No submissions found for ${country} - ${year} - ${month}`);
+            res.status(200).json({
+                section1: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
+                section2: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
+                section3: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
+                section4: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
+            });
+        }
+    } catch (error) {
+        console.error('Error fetching master responses:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// 7. Dashboard Responses Route: Get aggregated data for the dashboard
 app.get('/dashboard-responses', async (req, res) => {
     const { country, year, month } = req.query; // No need for role in the dashboard
 
-    console.log('Received dashboard request with:', { country, year, month });
+    console.log('Received /dashboard-responses request with:', { country, year, month });
 
     try {
         const pool = await sql.connect(config);
@@ -316,7 +428,7 @@ app.get('/dashboard-responses', async (req, res) => {
         if (submissions.length > 0) {
             // Aggregate responses from all submissions
             const cumulativeResponses = submissions.reduce((acc, submission) => {
-                const parsedResponses = JSON.parse(submission.responses);
+                const parsedResponses = JSON.parse(submission.responses || '{}');
                 return {
                     ...acc,
                     ...parsedResponses // Merge responses using question indices
@@ -365,8 +477,12 @@ app.get('/dashboard-responses', async (req, res) => {
     }
 });
 
-
 const apiUrl = process.env.REACT_APP_API_URL || 'https://food-security-back.azurewebsites.net';
+
+
+// -----------------------------------
+// Start the Server
+// -----------------------------------
 
 const port = process.env.PORT || 5001;
 app.listen(port, () => {
