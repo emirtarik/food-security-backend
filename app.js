@@ -341,15 +341,15 @@ app.get('/master-responses', async (req, res) => {
 
         const submissions = result.recordset;
 
-        if (submissions.length > 0) {
-            // Initialize aggregation objects
-            const aggregatedData = {
-                section1: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
-                section2: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
-                section3: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
-                section4: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
-            };
+        // Initialize aggregation objects with 'submitted' flag
+        const aggregatedData = {
+            section1: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {}, submitted: false },
+            section2: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {}, submitted: false },
+            section3: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {}, submitted: false },
+            section4: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {}, submitted: false },
+        };
 
+        if (submissions.length > 0) {
             submissions.forEach(submission => {
                 const role = submission.role; // e.g., 'section1'
                 if (aggregatedData[role]) {
@@ -357,6 +357,7 @@ app.get('/master-responses', async (req, res) => {
                     const comments = JSON.parse(submission.comments || '{}');
                     const actionPlans = JSON.parse(submission.actionPlanPerQuestion || '{}');
                     const savedActionPlans = JSON.parse(submission.savedActionPlans || '{}');
+                    const submitted = submission.submitted === true; // Ensure it's a boolean
 
                     // Aggregate responses
                     aggregatedData[role].responses = {
@@ -381,6 +382,9 @@ app.get('/master-responses', async (req, res) => {
                         ...aggregatedData[role].savedActionPlans,
                         ...savedActionPlans,
                     };
+
+                    // Set submitted flag
+                    aggregatedData[role].submitted = submitted;
                 }
             });
 
@@ -389,12 +393,7 @@ app.get('/master-responses', async (req, res) => {
             res.json(aggregatedData);
         } else {
             console.log(`No submissions found for ${country} - ${year} - ${month}`);
-            res.status(200).json({
-                section1: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
-                section2: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
-                section3: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
-                section4: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {} },
-            });
+            res.status(200).json(aggregatedData); // All sections have submitted: false
         }
     } catch (error) {
         console.error('Error fetching master responses:', error);
