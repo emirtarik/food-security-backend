@@ -180,6 +180,104 @@ app.post('/submit', async (req, res) => {
     }
 });
 
+app.post('/submit-master', async (req, res) => {
+    const {
+        country,
+        role,
+        year,
+        month,
+        responses, // Assuming this includes all sections
+        comments,
+        questionComments,
+        performanceScore,
+        financingNeed,
+        financingMobilized,
+        actionPlanPerQuestion,
+        savedActionPlans,
+        submitted,
+    } = req.body;
+
+    console.log('Received master submission for country:', country);
+    console.log('Received master submission for role:', role);
+    console.log('Received year:', year);
+    console.log('Received month:', month);
+    console.log('Submitted status:', submitted);
+    console.log('Action Plan Per Question:', actionPlanPerQuestion); // Log the action plan data
+    console.log('Saved Action Plans:', savedActionPlans); // Log saved action plans
+
+    try {
+        const pool = await sql.connect(config);
+
+        // Check if a master submission already exists
+        const existingSubmission = await pool.request()
+            .input('country', sql.VarChar, country)
+            .input('role', sql.VarChar, role)
+            .input('year', sql.VarChar, year)
+            .input('month', sql.VarChar, month)
+            .query('SELECT * FROM Submissions WHERE country = @country AND role = @role AND year = @year AND month = @month');
+
+        if (existingSubmission.recordset.length > 0) {
+            // Update the existing master submission
+            await pool.request()
+                .input('responses', sql.NVarChar, JSON.stringify(responses))
+                .input('comments', sql.NVarChar, comments)
+                .input('questionComments', sql.NVarChar, JSON.stringify(questionComments))
+                .input('performanceScore', sql.Float, performanceScore) // Changed to Float for numerical value
+                .input('financingNeed', sql.BigInt, financingNeed) // Changed to BigInt for larger numbers
+                .input('financingMobilized', sql.Float, financingMobilized)
+                .input('actionPlanPerQuestion', sql.NVarChar, JSON.stringify(actionPlanPerQuestion))
+                .input('savedActionPlans', sql.NVarChar, JSON.stringify(savedActionPlans))
+                .input('submitted', sql.Bit, submitted)
+                .input('country', sql.VarChar, country)
+                .input('role', sql.VarChar, role)
+                .input('year', sql.VarChar, year)
+                .input('month', sql.VarChar, month)
+                .query(`
+                    UPDATE Submissions 
+                    SET 
+                        responses = @responses, 
+                        comments = @comments, 
+                        questionComments = @questionComments, 
+                        performanceScore = @performanceScore, 
+                        financingNeed = @financingNeed, 
+                        financingMobilized = @financingMobilized, 
+                        actionPlanPerQuestion = @actionPlanPerQuestion,
+                        savedActionPlans = @savedActionPlans,
+                        submitted = @submitted
+                    WHERE country = @country AND role = @role AND year = @year AND month = @month
+                `);
+        } else {
+            // Insert a new master submission
+            await pool.request()
+                .input('country', sql.VarChar, country)
+                .input('role', sql.VarChar, role)
+                .input('year', sql.VarChar, year)
+                .input('month', sql.VarChar, month)
+                .input('responses', sql.NVarChar, JSON.stringify(responses))
+                .input('comments', sql.NVarChar, comments)
+                .input('questionComments', sql.NVarChar, JSON.stringify(questionComments))
+                .input('performanceScore', sql.Float, performanceScore)
+                .input('financingNeed', sql.BigInt, financingNeed)
+                .input('financingMobilized', sql.Float, financingMobilized)
+                .input('actionPlanPerQuestion', sql.NVarChar, JSON.stringify(actionPlanPerQuestion))
+                .input('savedActionPlans', sql.NVarChar, JSON.stringify(savedActionPlans))
+                .input('submitted', sql.Bit, submitted)
+                .query(`
+                    INSERT INTO Submissions 
+                        (country, role, year, month, responses, comments, questionComments, performanceScore, financingNeed, financingMobilized, actionPlanPerQuestion, savedActionPlans, submitted)
+                    VALUES 
+                        (@country, @role, @year, @month, @responses, @comments, @questionComments, @performanceScore, @financingNeed, @financingMobilized, @actionPlanPerQuestion, @savedActionPlans, @submitted)
+                `);
+        }
+
+        console.log(`Master submission saved/updated for country: ${country}, role: ${role}, year: ${year}, month: ${month}`);
+        res.status(200).send('Master responses saved/updated in the database');
+    } catch (error) {
+        console.error('Error saving master submission:', error);
+        res.status(500).send('Error saving master submission');
+    }
+});
+
 app.get('/available-countries', async (req, res) => {
     try {
       const pool = await sql.connect(config);
