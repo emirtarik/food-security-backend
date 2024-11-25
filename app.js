@@ -253,6 +253,28 @@ app.get('/responses', async (req, res) => {
                 return res.status(500).send('Error parsing responses data');
             }
 
+            // Parse 'comments' JSON string (if applicable)
+            let parsedComments = '';
+            if (submission.comments) {
+                try {
+                    parsedComments = JSON.parse(submission.comments);
+                } catch (parseError) {
+                    console.error('Error parsing comments JSON:', parseError);
+                    parsedComments = submission.comments; // Fallback to raw string
+                }
+            }
+
+            // **Parse 'questionComments' JSON string**
+            let parsedQuestionComments = {};
+            if (submission.questionComments) {
+                try {
+                    parsedQuestionComments = JSON.parse(submission.questionComments);
+                } catch (parseError) {
+                    console.error('Error parsing questionComments JSON:', parseError);
+                    parsedQuestionComments = {}; // Fallback to empty object
+                }
+            }
+
             // Parse 'actionPlanPerQuestion' if it's stored as a JSON string
             let parsedActionPlanPerQuestion = {};
             if (submission.actionPlanPerQuestion) {
@@ -260,7 +282,6 @@ app.get('/responses', async (req, res) => {
                     parsedActionPlanPerQuestion = JSON.parse(submission.actionPlanPerQuestion);
                 } catch (parseError) {
                     console.error('Error parsing actionPlanPerQuestion JSON:', parseError);
-                    // Optionally handle the error or set to an empty object
                     parsedActionPlanPerQuestion = {};
                 }
             }
@@ -272,19 +293,17 @@ app.get('/responses', async (req, res) => {
                     parsedSavedActionPlans = JSON.parse(submission.savedActionPlans);
                 } catch (parseError) {
                     console.error('Error parsing savedActionPlans JSON:', parseError);
-                    // Optionally handle the error or set to an empty object
                     parsedSavedActionPlans = {};
                 }
             }
 
-            // Parse 'actionPlan' if it's stored as a JSON string (optional, based on your needs)
+            // Parse 'actionPlan' if it's stored as a JSON string (optional)
             let parsedActionPlan = [];
             if (submission.actionPlan) {
                 try {
                     parsedActionPlan = JSON.parse(submission.actionPlan);
                 } catch (parseError) {
                     console.error('Error parsing actionPlan JSON:', parseError);
-                    // Optionally handle the error or set to an empty array
                     parsedActionPlan = [];
                 }
             }
@@ -293,7 +312,8 @@ app.get('/responses', async (req, res) => {
             const responseData = {
                 responses: parsedResponses, // Flat object mapping question keys to scores
                 submitted: submission.submitted, // Assuming 'submitted' is a boolean
-                comments: submission.comments || '',
+                comments: parsedComments, // Parsed comments
+                questionComments: parsedQuestionComments, // **Include questionComments**
                 performanceScore: submission.performanceScore || 0,
                 financingNeed: submission.financingNeed || 0,
                 financingMobilized: submission.financingMobilized || 0,
@@ -313,6 +333,7 @@ app.get('/responses', async (req, res) => {
         res.status(500).send('Error fetching stored responses');
     }
 });
+
 
 app.get('/master-responses', async (req, res) => {
     const { country, year, month } = req.query;
@@ -343,10 +364,10 @@ app.get('/master-responses', async (req, res) => {
 
         // Initialize aggregation objects with 'submitted' flag
         const aggregatedData = {
-            section1: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {}, submitted: false },
-            section2: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {}, submitted: false },
-            section3: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {}, submitted: false },
-            section4: { responses: {}, comments: {}, actionPlans: {}, savedActionPlans: {}, submitted: false },
+            section1: { responses: {}, comments: {}, questionComments: {}, actionPlans: {}, savedActionPlans: {}, submitted: false },
+            section2: { responses: {}, comments: {}, questionComments: {}, actionPlans: {}, savedActionPlans: {}, submitted: false },
+            section3: { responses: {}, comments: {}, questionComments: {}, actionPlans: {}, savedActionPlans: {}, submitted: false },
+            section4: { responses: {}, comments: {}, questionComments: {}, actionPlans: {}, savedActionPlans: {}, submitted: false },
         };
 
         if (submissions.length > 0) {
@@ -355,6 +376,7 @@ app.get('/master-responses', async (req, res) => {
                 if (aggregatedData[role]) {
                     const responses = JSON.parse(submission.responses || '{}');
                     const comments = JSON.parse(submission.comments || '{}');
+                    const questionComments = JSON.parse(submission.questionComments || '{}'); // **Parse questionComments**
                     const actionPlans = JSON.parse(submission.actionPlanPerQuestion || '{}');
                     const savedActionPlans = JSON.parse(submission.savedActionPlans || '{}');
                     const submitted = submission.submitted === true; // Ensure it's a boolean
@@ -369,6 +391,12 @@ app.get('/master-responses', async (req, res) => {
                     aggregatedData[role].comments = {
                         ...aggregatedData[role].comments,
                         ...comments,
+                    };
+
+                    // **Aggregate questionComments**
+                    aggregatedData[role].questionComments = {
+                        ...aggregatedData[role].questionComments,
+                        ...questionComments,
                     };
 
                     // Aggregate action plans
@@ -402,6 +430,7 @@ app.get('/master-responses', async (req, res) => {
 });
 
 
+
 app.get('/dashboard-responses', async (req, res) => {
     const { country, year, month } = req.query; // No need for role in the dashboard
 
@@ -420,7 +449,7 @@ app.get('/dashboard-responses', async (req, res) => {
         if (submissions.length > 0) {
             // Aggregate responses from all submissions
             const cumulativeResponses = submissions.reduce((acc, submission) => {
-                const parsedResponses = JSON.parse(submission.responses);
+                const parsedResponses = JSON.parse(submission.responses || '{}');
                 return {
                     ...acc,
                     ...parsedResponses // Merge responses using question indices
@@ -440,6 +469,15 @@ app.get('/dashboard-responses', async (req, res) => {
                 return acc;
             }, {});
 
+            // **Aggregate questionComments from all submissions**
+            const cumulativeQuestionComments = submissions.reduce((acc, submission) => {
+                const parsedQuestionComments = JSON.parse(submission.questionComments || '{}');
+                return {
+                    ...acc,
+                    ...parsedQuestionComments
+                };
+            }, {});
+
             // Optionally, aggregate actionPlanPerQuestion if needed
             const cumulativeActionPlanPerQuestion = submissions.reduce((acc, submission) => {
                 const parsedActionPlan = JSON.parse(submission.actionPlanPerQuestion || '{}');
@@ -452,22 +490,28 @@ app.get('/dashboard-responses', async (req, res) => {
                 return acc;
             }, {});
 
-            console.log('Sending back data for the dashboard:', { cumulativeResponses, cumulativeSavedActionPlans });
+            console.log('Sending back data for the dashboard:', {
+                cumulativeResponses,
+                cumulativeSavedActionPlans,
+                cumulativeQuestionComments
+            });
 
             res.json({
                 responses: cumulativeResponses,
                 savedActionPlans: cumulativeSavedActionPlans,
+                questionComments: cumulativeQuestionComments // **Include questionComments**
                 // actionPlanPerQuestion: cumulativeActionPlanPerQuestion, // Uncomment if needed
             });
         } else {
             console.log(`No submissions found for ${country} - ${year} - ${month}`);
-            res.status(200).json({ responses: {}, savedActionPlans: {} }); // Respond with empty objects
+            res.status(200).json({ responses: {}, savedActionPlans: {}, questionComments: {} }); // Respond with empty objects
         }
     } catch (error) {
         console.error('Error fetching dashboard responses:', error);
         res.status(500).send('Error fetching dashboard responses');
     }
 });
+
 
 
 const apiUrl = process.env.REACT_APP_API_URL || 'https://food-security-back.azurewebsites.net';
