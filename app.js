@@ -528,6 +528,67 @@ app.get('/master-responses', async (req, res) => {
 });
 
 
+app.get('/dashboard-master-responses', async (req, res) => {
+    const { country, year, month } = req.query;
+
+    if (!country || !year || !month) {
+        return res.status(400).json({ error: 'country, year, and month are required' });
+    }
+
+    console.log('Received /dashboard-master-responses request with:', { country, year, month });
+
+    try {
+        const pool = await sql.connect(config);
+
+        // Fetch the master submission
+        const submission = await pool.request()
+            .input('country', sql.VarChar, country)
+            .input('role', sql.VarChar, 'master') // Ensure role is master
+            .input('year', sql.VarChar, year)
+            .input('month', sql.VarChar, month)
+            .query(`
+                SELECT * FROM Submissions 
+                WHERE country = @country 
+                  AND role = @role 
+                  AND year = @year 
+                  AND month = @month
+            `);
+
+        if (submission.recordset.length === 0) {
+            console.log(`No master submission found for ${country} - ${year} - ${month}`);
+            return res.status(404).json({ error: 'No master submission found for the provided parameters' });
+        }
+
+        const masterSubmission = submission.recordset[0];
+
+        // Prepare the data to send to the Dashboard
+        const dashboardData = {
+            performanceScore: parseFloat(masterSubmission.performanceScore),
+            financingNeed: parseFloat(masterSubmission.financingNeed),
+            financingMobilized: parseFloat(masterSubmission.financingMobilized),
+            responses: JSON.parse(masterSubmission.responses || '{}'),
+            comments: masterSubmission.comments || '',
+            questionComments: JSON.parse(masterSubmission.questionComments || '{}'),
+            actionPlans: JSON.parse(masterSubmission.actionPlanPerQuestion || '{}'),
+            savedActionPlans: JSON.parse(masterSubmission.savedActionPlans || '{}'),
+            submitted: masterSubmission.submitted === true,
+        };
+
+        console.log('Sending back dashboard master data:', dashboardData);
+
+        res.status(200).json(dashboardData);
+    } catch (error) {
+        console.error('Error fetching dashboard master responses:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Start the server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
+
 
 app.get('/dashboard-responses', async (req, res) => {
     const { country, year, month } = req.query; // No need for role in the dashboard
