@@ -36,22 +36,6 @@ const config = {
     }
 };
 
-// Middleware for verifying master role / to be implemented later
-// const verifyMasterRole = (req, res, next) => {
-//     if (req.user) {
-//         console.log(`User role: ${req.user.role}`);
-//         if (req.user.role === 'master') {
-//             next();
-//         } else {
-//             console.log('User is not a master');
-//             res.status(403).json({ message: 'Forbidden: Insufficient permissions' });
-//         }
-//     } else {
-//         console.log('No user found in request');
-//         res.status(403).json({ message: 'Forbidden: No user information' });
-//     }
-// };
-
 // Login route: authenticate users based on MSSQL Users table
 app.post('/login', async (req, res) => {
     const { username, password } = req.body;
