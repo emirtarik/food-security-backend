@@ -6,7 +6,8 @@ const app = express();
 
 const allowedOrigins = [
     'http://localhost:3000',
-    'https://food-security-front.azurewebsites.net'
+    'https://food-security-front.azurewebsites.net',
+    'https://food-security.net'
   ];
 
   app.use(cors({
@@ -514,85 +515,91 @@ app.get('/master-responses', async (req, res) => {
 
 
 app.get('/dashboard-responses', async (req, res) => {
-    const { country, year, month } = req.query; // No need for role in the dashboard
+  const { country, year, month } = req.query;
+  console.log('Received dashboard request with:', { country, year, month });
 
-    console.log('Received dashboard request with:', { country, year, month });
+  try {
+    const pool = await sql.connect(config);
+    const result = await pool.request()
+      .input('country', sql.VarChar, country)
+      .input('year',    sql.VarChar, year)
+      .input('month',   sql.VarChar, month)
+      .query(`
+        SELECT
+          responses,
+          savedActionPlans,
+          questionComments,
+          performanceScore,
+          financingNeed,
+          financingMobilized
+        FROM Submissions
+        WHERE country = @country
+          AND year    = @year
+          AND month   = @month
+      `);
 
-    try {
-        const pool = await sql.connect(config);
-        const result = await pool.request()
-            .input('country', sql.VarChar, country)
-            .input('year', sql.VarChar, year)
-            .input('month', sql.VarChar, month)
-            .query('SELECT * FROM Submissions WHERE country = @country AND year = @year AND month = @month');
+    const submissions = result.recordset;
 
-        const submissions = result.recordset;
-
-        if (submissions.length > 0) {
-            // Aggregate responses from all submissions
-            const cumulativeResponses = submissions.reduce((acc, submission) => {
-                const parsedResponses = JSON.parse(submission.responses || '{}');
-                return {
-                    ...acc,
-                    ...parsedResponses // Merge responses using question indices
-                };
-            }, {});
-
-            // Aggregate savedActionPlans from all submissions
-            const cumulativeSavedActionPlans = submissions.reduce((acc, submission) => {
-                const parsedSavedActionPlans = JSON.parse(submission.savedActionPlans || '{}');
-                // Iterate through each question's saved action plans
-                for (const [questionKey, plans] of Object.entries(parsedSavedActionPlans)) {
-                    if (!acc[questionKey]) {
-                        acc[questionKey] = [];
-                    }
-                    acc[questionKey].push(...plans);
-                }
-                return acc;
-            }, {});
-
-            // **Aggregate questionComments from all submissions**
-            const cumulativeQuestionComments = submissions.reduce((acc, submission) => {
-                const parsedQuestionComments = JSON.parse(submission.questionComments || '{}');
-                return {
-                    ...acc,
-                    ...parsedQuestionComments
-                };
-            }, {});
-
-            // Optionally, aggregate actionPlanPerQuestion if needed
-            const cumulativeActionPlanPerQuestion = submissions.reduce((acc, submission) => {
-                const parsedActionPlan = JSON.parse(submission.actionPlanPerQuestion || '{}');
-                for (const [questionKey, plans] of Object.entries(parsedActionPlan)) {
-                    if (!acc[questionKey]) {
-                        acc[questionKey] = [];
-                    }
-                    acc[questionKey].push(...plans);
-                }
-                return acc;
-            }, {});
-
-            console.log('Sending back data for the dashboard:', {
-                cumulativeResponses,
-                cumulativeSavedActionPlans,
-                cumulativeQuestionComments
-            });
-
-            res.json({
-                responses: cumulativeResponses,
-                savedActionPlans: cumulativeSavedActionPlans,
-                questionComments: cumulativeQuestionComments // **Include questionComments**
-                // actionPlanPerQuestion: cumulativeActionPlanPerQuestion, // Uncomment if needed
-            });
-        } else {
-            console.log(`No submissions found for ${country} - ${year} - ${month}`);
-            res.status(200).json({ responses: {}, savedActionPlans: {}, questionComments: {} }); // Respond with empty objects
+    if (submissions.length > 0) {
+      // 1) Merge all responses
+      const cumulativeResponses = submissions.reduce((acc, s) => {
+        return { ...acc, ...JSON.parse(s.responses  || '{}') };
+      }, {});
+      // 2) Merge all savedActionPlans
+      const cumulativeSavedActionPlans = submissions.reduce((acc, s) => {
+        const parsed = JSON.parse(s.savedActionPlans || '{}');
+        for (const [k, plans] of Object.entries(parsed)) {
+          acc[k] = (acc[k] || []).concat(plans);
         }
-    } catch (error) {
-        console.error('Error fetching dashboard responses:', error);
-        res.status(500).send('Error fetching dashboard responses');
+        return acc;
+      }, {});
+      // 3) Merge all questionComments
+      const cumulativeQuestionComments = submissions.reduce((acc, s) => {
+        return { ...acc, ...JSON.parse(s.questionComments || '{}') };
+      }, {});
+
+      // 4) Extract and parse your three metrics from the first record
+      const { performanceScore: rawPerf, financingNeed: rawNeed, financingMobilized: rawMob } = submissions[0];
+      const performanceScore   = rawPerf != null ? parseFloat(rawPerf) : 0;
+      const financingNeed      = rawNeed  != null ? parseFloat(rawNeed)  : 0;
+      const financingMobilized = rawMob   != null ? parseFloat(rawMob)   : 0;
+
+      console.log('Sending back data for the dashboard:', {
+        cumulativeResponses,
+        cumulativeSavedActionPlans,
+        cumulativeQuestionComments,
+        performanceScore,
+        financingNeed,
+        financingMobilized
+      });
+
+      return res.json({
+        responses:           cumulativeResponses,
+        savedActionPlans:    cumulativeSavedActionPlans,
+        questionComments:    cumulativeQuestionComments,
+        performanceScore,
+        financingNeed,
+        financingMobilized
+      });
     }
+
+    // No submissions found → return empty objects + zeros
+    console.log(`No submissions for ${country} - ${year} - ${month}`);
+    return res.status(200).json({
+      responses:            {},
+      savedActionPlans:     {},
+      questionComments:     {},
+      performanceScore:     0,
+      financingNeed:        0,
+      financingMobilized:   0
+    });
+  } catch (error) {
+    console.error('Error fetching dashboard responses:', error);
+    return res.status(500).send('Error fetching dashboard responses');
+  }
 });
+
+
 
 
 
