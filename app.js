@@ -7,7 +7,8 @@ const app = express();
 const allowedOrigins = [
     'http://localhost:3000',
     'https://food-security-front.azurewebsites.net',
-    'https://food-security.net'
+    'https://food-security.net',
+    'https://www.food-security.net'
   ];
 
   app.use(cors({
