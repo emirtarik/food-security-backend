@@ -12,25 +12,8 @@ const allowedOrigins = [
   'https://www.food-security.net'
 ];
 
-// build a reusable CORS options object
-const corsOptions = {
-  origin: function (origin, callback) {
-    console.log('CORS check for origin:', origin);
-    // allow requests with no origin (mobile clients, curl, etc.)
-    if (!origin || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    callback(new Error(`Not allowed by CORS: ${origin}`));
-  },
-  credentials: true,          // allow cookies, Authorization headers, etc.
-  methods: ['GET','POST','OPTIONS'] // be explicit about allowed methods
-};
-
-// apply CORS to all routes
-app.use(cors(corsOptions));
-
-// explicit handler for all OPTIONS preflights
-app.options('*', cors(corsOptions));
+app.use(cors());        // <-- allow everything
+app.options('*', cors());
 
 // then parse JSON bodies
 app.use(express.json());
