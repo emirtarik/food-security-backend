@@ -4,26 +4,35 @@ const sql = require('mssql');
 
 const app = express();
 
+// your full list of allowed origins
 const allowedOrigins = [
-    'http://localhost:3000',
-    'https://food-security-front.azurewebsites.net',
-    'https://food-security.net',
-    'https://www.food-security.net'
-  ];
+  'http://localhost:3000',
+  'https://food-security-front.azurewebsites.net',
+  'https://food-security.net',
+  'https://www.food-security.net'
+];
 
-  app.use(cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (e.g., mobile apps, Postman)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,  // Allow credentials (cookies, authorization headers, etc.)
-  }));
-  
+// build a reusable CORS options object
+const corsOptions = {
+  origin: function (origin, callback) {
+    console.log('CORS check for origin:', origin);
+    // allow requests with no origin (mobile clients, curl, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    callback(new Error(`Not allowed by CORS: ${origin}`));
+  },
+  credentials: true,          // allow cookies, Authorization headers, etc.
+  methods: ['GET','POST','OPTIONS'] // be explicit about allowed methods
+};
+
+// apply CORS to all routes
+app.use(cors(corsOptions));
+
+// explicit handler for all OPTIONS preflights
+app.options('*', cors(corsOptions));
+
+// then parse JSON bodies
 app.use(express.json());
 
 const config = {
