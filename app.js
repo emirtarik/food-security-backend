@@ -1,12 +1,14 @@
-const express = require('express');
-const cors    = require('cors');
-const sql     = require('mssql');
+import express from 'express';
+import cors    from 'cors';
+import sql     from 'mssql';
 
 const app = express();
 
 const allowedOrigins = [
   'http://localhost:3000',
+  'http://localhost:5001',
   'https://food-security-front.azurewebsites.net',
+  'https://food-security-back.azurewebsites.net',
   'https://food-security.net',
   'https://www.food-security.net'
 ];
@@ -14,26 +16,18 @@ const allowedOrigins = [
 const corsOptions = {
   origin(origin, callback) {
     console.log('CORS check for origin:', origin);
-    // allow requests with no origin (e.g. curl, mobile)
     if (!origin || allowedOrigins.includes(origin)) {
       return callback(null, true);
     }
-    // explicit CORS rejection
     callback(new Error(`Not allowed by CORS: ${origin}`));
   },
   credentials: true,
   methods: ['GET','POST','OPTIONS']
 };
 
-// 1) apply CORS to all routes
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions), (req, res) => res.sendStatus(204));
 
-// 2) explicit preflight handler: always reply 204
-app.options('*', cors(corsOptions), (req, res) => {
-  res.sendStatus(204);
-});
-
-// 3) your JSON body parser
 app.use(express.json());
 
 // 4) catch CORS errors and return 403 (instead of 500)
