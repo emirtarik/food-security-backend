@@ -1,10 +1,9 @@
 const express = require('express');
-const cors = require('cors');
-const sql = require('mssql');
+const cors    = require('cors');
+const sql     = require('mssql');
 
 const app = express();
 
-// your full list of allowed origins
 const allowedOrigins = [
   'http://localhost:3000',
   'https://food-security-front.azurewebsites.net',
@@ -12,23 +11,38 @@ const allowedOrigins = [
   'https://www.food-security.net'
 ];
 
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-  }
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Credentials', true);
-  return next();
+const corsOptions = {
+  origin(origin, callback) {
+    console.log('CORS check for origin:', origin);
+    // allow requests with no origin (e.g. curl, mobile)
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    // explicit CORS rejection
+    callback(new Error(`Not allowed by CORS: ${origin}`));
+  },
+  credentials: true,
+  methods: ['GET','POST','OPTIONS']
+};
+
+// 1) apply CORS to all routes
+app.use(cors(corsOptions));
+
+// 2) explicit preflight handler: always reply 204
+app.options('*', cors(corsOptions), (req, res) => {
+  res.sendStatus(204);
 });
 
-app.options('/*', (req, res) => {
-  res.sendStatus(200);
-});
-
-// then parse JSON bodies
+// 3) your JSON body parser
 app.use(express.json());
+
+// 4) catch CORS errors and return 403 (instead of 500)
+app.use((err, req, res, next) => {
+  if (err.message && err.message.startsWith('Not allowed by CORS')) {
+    return res.status(403).json({ error: err.message });
+  }
+  next(err);
+});
 
 const config = {
     user: 'admin',  // Replace with your RDS master username
