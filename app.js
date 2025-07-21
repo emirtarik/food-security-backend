@@ -12,19 +12,20 @@ const allowedOrigins = [
   'https://www.food-security.net'
 ];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // allow requests with no origin
-    // (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      var msg = 'The CORS policy for this site does not ' +
-                'allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
   }
-}));
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', true);
+  return next();
+});
+
+app.options('/*', (req, res) => {
+  res.sendStatus(200);
+});
 
 // then parse JSON bodies
 app.use(express.json());
