@@ -4,39 +4,92 @@ import sql     from 'mssql';
 
 const app = express();
 
+// Debug: Log all incoming requests
+app.use((req, res, next) => {
+  console.log('=== Incoming Request ===');
+  console.log(`${req.method} ${req.url}`);
+  console.log('Origin:', req.get('Origin'));
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  next();
+});
+
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5001',
   'https://food-security-front.azurewebsites.net',
   'https://food-security-back.azurewebsites.net',
   'https://food-security.net',
-  'https://www.food-security.net'
+  'https://www.food-security.net',
+  'https://www.food-security.net/login'
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    console.log('CORS check for origin:', origin);
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) {
+      console.log('No origin - allowing');
+      return callback(null, true);
+    }
+    
+    if (allowedOrigins.includes(origin)) {
+      console.log('Origin allowed:', origin);
       callback(null, true);
     } else {
-      console.error('CORS Error: Origin not allowed:', origin);
-      callback(new Error('Not allowed by CORS'));
+      console.log('Origin NOT allowed:', origin);
+      console.log('Available origins:', allowedOrigins);
+      callback(new Error(`CORS Error: Origin ${origin} not allowed`));
     }
   },
   credentials: true,
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With', 
+    'Content-Type', 
+    'Accept',
+    'Authorization',
+    'Cache-Control',
+    'X-Requested-With'
+  ],
   preflightContinue: false,
   optionsSuccessStatus: 204
 };
 
+
 app.use(cors(corsOptions));
 
-app.options('*', cors(corsOptions));
+// Explicit OPTIONS handler for all routes
+app.options('*', (req, res) => {
+  console.log('=== OPTIONS Request ===');
+  console.log('Origin:', req.get('Origin'));
+  console.log('Access-Control-Request-Method:', req.get('Access-Control-Request-Method'));
+  console.log('Access-Control-Request-Headers:', req.get('Access-Control-Request-Headers'));
+  
+  const origin = req.get('Origin');
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin,X-Requested-With,Content-Type,Accept,Authorization,Cache-Control');
+    res.status(204).send();
+  } else {
+    res.status(403).send('CORS not allowed');
+  }
+});
 
 app.use(express.json());
+
+// Add response headers middleware
+app.use((req, res, next) => {
+  const origin = req.get('Origin');
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+  next();
+});
 
 const config = {
     user: 'admin',  // Replace with your RDS master username
