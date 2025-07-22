@@ -14,12 +14,27 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-  origin: allowedOrigins,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.error('CORS Error: Origin not allowed:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
-  methods: ['GET','POST','OPTIONS']
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };
 
 app.use(cors(corsOptions));
+
+app.options('*', cors(corsOptions));
 
 app.use(express.json());
 
@@ -602,10 +617,17 @@ app.get('/dashboard-responses', async (req, res) => {
 // CATCH CORS ERRORS - This should be at the end
 app.use((err, req, res, next) => {
   if (err.message && err.message.startsWith('Not allowed by CORS')) {
+    console.error('CORS Error Details:', {
+      origin: req.get('Origin'),
+      method: req.method,
+      path: req.path,
+      headers: req.headers
+    });
     return res.status(403).json({ error: err.message });
   }
   next(err);
 });
+
 
 const apiUrl = process.env.REACT_APP_API_URL || 'https://food-security-back.azurewebsites.net';
 
