@@ -14,13 +14,7 @@ const allowedOrigins = [
 ];
 
 const corsOptions = {
-  origin(origin, callback) {
-    console.log('CORS check for origin:', origin);
-    if (!origin || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    callback(new Error(`Not allowed by CORS: ${origin}`));
-  },
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET','POST','OPTIONS']
 };
@@ -28,14 +22,6 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 app.use(express.json());
-
-// 4) catch CORS errors and return 403 (instead of 500)
-app.use((err, req, res, next) => {
-  if (err.message && err.message.startsWith('Not allowed by CORS')) {
-    return res.status(403).json({ error: err.message });
-  }
-  next(err);
-});
 
 const config = {
     user: 'admin',  // Replace with your RDS master username
@@ -613,11 +599,18 @@ app.get('/dashboard-responses', async (req, res) => {
 
 
 
-
+// CATCH CORS ERRORS - This should be at the end
+app.use((err, req, res, next) => {
+  if (err.message && err.message.startsWith('Not allowed by CORS')) {
+    return res.status(403).json({ error: err.message });
+  }
+  next(err);
+});
 
 const apiUrl = process.env.REACT_APP_API_URL || 'https://food-security-back.azurewebsites.net';
 
 const port = process.env.PORT || 5001;
+
 app.listen(port, () => {
     console.log(`Backend is working on port ${port}`);
 });
