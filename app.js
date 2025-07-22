@@ -667,19 +667,18 @@ app.get('/dashboard-responses', async (req, res) => {
 
 
 
-// CATCH CORS ERRORS - This should be at the end
+// after all routes, before listen():
+
 app.use((err, req, res, next) => {
-  if (err.message && err.message.startsWith('Not allowed by CORS')) {
-    console.error('CORS Error Details:', {
-      origin: req.get('Origin'),
-      method: req.method,
-      path: req.path,
-      headers: req.headers
-    });
-    return res.status(403).json({ error: err.message });
+  const origin = req.get('Origin');
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
   }
-  next(err);
+  console.error('💥 Unexpected error in', req.method, req.path, err);
+  res.status(err.status || 500).json({ error: err.message });
 });
+
 
 const port = process.env.PORT || 5001;
 
