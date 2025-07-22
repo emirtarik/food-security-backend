@@ -1,6 +1,6 @@
-import express from 'express';
-import cors    from 'cors';
-import sql     from 'mssql';
+const express = require('express');
+const cors    = require('cors');
+const sql     = require('mssql');
 
 const app = express();
 
@@ -680,9 +680,6 @@ app.use((err, req, res, next) => {
   }
   next(err);
 });
-
-
-const apiUrl = process.env.REACT_APP_API_URL || 'https://food-security-back.azurewebsites.net';
 
 const port = process.env.PORT || 5001;
 
