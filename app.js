@@ -19,8 +19,7 @@ const allowedOrigins = [
   'https://food-security-front.azurewebsites.net',
   'https://food-security-back.azurewebsites.net',
   'https://food-security.net',
-  'https://www.food-security.net',
-  'https://www.food-security.net/login'
+  'https://www.food-security.net'
 ];
 
 const corsOptions = {
