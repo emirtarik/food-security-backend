@@ -75,20 +75,31 @@ app.options('*', (req, res) => {
   console.log('Origin:', req.get('Origin'));
   console.log('Access-Control-Request-Method:', req.get('Access-Control-Request-Method'));
   console.log('Access-Control-Request-Headers:', req.get('Access-Control-Request-Headers'));
+  console.log('URL:', req.url);
+  console.log('Method:', req.method);
   
   const origin = req.get('Origin');
+  console.log('Checking origin:', origin, 'against allowed origins:', allowedOrigins);
+  
   if (allowedOrigins.includes(origin)) {
+    console.log('Origin allowed, setting CORS headers');
     res.header('Access-Control-Allow-Origin', origin);
     res.header('Access-Control-Allow-Credentials', 'true');
     res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
     res.header('Access-Control-Allow-Headers', 'Origin,X-Requested-With,Content-Type,Accept,Authorization,Cache-Control');
     res.status(204).send();
   } else {
+    console.log('Origin NOT allowed:', origin);
     res.status(403).send('CORS not allowed');
   }
 });
 
 app.use(express.json());
+
+// Add a simple root route for testing
+app.get('/', (req, res) => {
+  res.json({ message: 'Backend is running', timestamp: new Date().toISOString() });
+});
 
 const config = {
     user: 'admin',  // Replace with your RDS master username
