@@ -59,6 +59,16 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
+// Ensure CORS headers are set as early as possible for all requests
+app.use((req, res, next) => {
+  const origin = req.get('Origin');
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+  }
+  next();
+});
+
 // Explicit OPTIONS handler for all routes
 app.options('*', (req, res) => {
   console.log('=== OPTIONS Request ===');
@@ -79,16 +89,6 @@ app.options('*', (req, res) => {
 });
 
 app.use(express.json());
-
-// Add response headers middleware
-app.use((req, res, next) => {
-  const origin = req.get('Origin');
-  if (allowedOrigins.includes(origin)) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
-  }
-  next();
-});
 
 const config = {
     user: 'admin',  // Replace with your RDS master username
@@ -127,6 +127,14 @@ app.post('/login', async (req, res) => {
         }
     } catch (error) {
         console.error('Error during login:', error);
+        // Ensure CORS headers are present even on error
+        const origin = req.get('Origin');
+        if (allowedOrigins.includes(origin)) {
+            res.header('Access-Control-Allow-Origin', origin);
+            res.header('Access-Control-Allow-Credentials', 'true');
+            res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
+            res.header('Access-Control-Allow-Headers', 'Origin,X-Requested-With,Content-Type,Accept,Authorization,Cache-Control');
+        }
         res.status(500).json({ message: 'Login failed' });
     }
 });
