@@ -59,12 +59,55 @@ const allowedOrigins = [
 
 // app.use(cors(corsOptions));
 
-// DISABLED CORS - Allow all origins
+// CORS configuration for local development and production
 app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
+  const origin = req.get('Origin');
+  
+  console.log(`=== CORS Request ===`);
+  console.log(`Method: ${req.method}`);
+  console.log(`Origin: ${origin}`);
+  console.log(`URL: ${req.url}`);
+  
+  // Allow local development
+  if (origin === 'http://localhost:3000') {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Local development origin allowed');
+  }
+  // Allow Azure frontend
+  else if (origin === 'https://food-security-front.azurewebsites.net') {
+    res.header('Access-Control-Allow-Origin', 'https://food-security-front.azurewebsites.net');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Azure frontend origin allowed');
+  }
+  // Allow other production origins
+  else if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Production origin allowed');
+  }
+  // Allow requests with no origin (like mobile apps or curl requests)
+  else if (!origin) {
+    res.header('Access-Control-Allow-Origin', '*');
+    console.log('✅ No origin request allowed');
+  }
+  else {
+    console.log('❌ Origin not allowed:', origin);
+    console.log('Available origins:', allowedOrigins);
+  }
+  
+  // Set CORS headers for all requests
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control');
-  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, X-Requested-With');
+  res.header('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    console.log('🔄 Preflight request handled');
+    res.status(204).send();
+    return;
+  }
+  
   next();
 });
 
@@ -95,9 +138,54 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+// Dedicated preflight handler for complex routes
+app.options('*', (req, res) => {
+  console.log('=== Dedicated Preflight Handler ===');
+  console.log('Requested Method:', req.get('Access-Control-Request-Method'));
+  console.log('Requested Headers:', req.get('Access-Control-Request-Headers'));
+  console.log('Origin:', req.get('Origin'));
+  
+  const origin = req.get('Origin');
+  
+  // Set appropriate CORS headers for preflight
+  if (origin === 'http://localhost:3000') {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Local development preflight allowed');
+  } else if (origin === 'https://food-security-front.azurewebsites.net') {
+    res.header('Access-Control-Allow-Origin', 'https://food-security-front.azurewebsites.net');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Azure frontend preflight allowed');
+  } else if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Production preflight allowed');
+  } else {
+    console.log('❌ Preflight origin not allowed:', origin);
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, X-Requested-With');
+  res.header('Access-Control-Max-Age', '86400');
+  
+  console.log('✅ Preflight response sent');
+  res.status(204).send();
+});
+
 // Add a simple root route for testing
 app.get('/', (req, res) => {
   res.json({ message: 'Backend is running', timestamp: new Date().toISOString() });
+});
+
+// Test route for CORS verification
+app.get('/test-cors', (req, res) => {
+  console.log('=== CORS Test Route ===');
+  console.log('Origin:', req.get('Origin'));
+  res.json({ 
+    message: 'CORS test successful', 
+    timestamp: new Date().toISOString(),
+    origin: req.get('Origin')
+  });
 });
 
 const config = {
@@ -111,6 +199,31 @@ const config = {
         trustServerCertificate: true  // Recommended for production environments
     }
 };
+
+// Preflight handler for login route
+app.options('/login', (req, res) => {
+  console.log('=== Login Preflight ===');
+  const origin = req.get('Origin');
+  if (origin === 'http://localhost:3000') {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Local login preflight allowed');
+  } else if (origin === 'https://food-security-front.azurewebsites.net') {
+    res.header('Access-Control-Allow-Origin', 'https://food-security-front.azurewebsites.net');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Azure login preflight allowed');
+  } else if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Production login preflight allowed');
+  } else {
+    console.log('❌ Login preflight origin not allowed:', origin);
+  }
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Max-Age', '86400');
+  res.status(204).send();
+});
 
 // Login route: authenticate users based on MSSQL Users table
 app.post('/login', async (req, res) => {
@@ -144,6 +257,31 @@ app.post('/login', async (req, res) => {
         res.header('Access-Control-Allow-Headers', 'Origin,X-Requested-With,Content-Type,Accept,Authorization,Cache-Control');
         res.status(500).json({ message: 'Login failed' });
     }
+});
+
+// Preflight handler for submit route
+app.options('/submit', (req, res) => {
+  console.log('=== Submit Preflight ===');
+  const origin = req.get('Origin');
+  if (origin === 'http://localhost:3000') {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Local submit preflight allowed');
+  } else if (origin === 'https://food-security-front.azurewebsites.net') {
+    res.header('Access-Control-Allow-Origin', 'https://food-security-front.azurewebsites.net');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Azure submit preflight allowed');
+  } else if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Production submit preflight allowed');
+  } else {
+    console.log('❌ Submit preflight origin not allowed:', origin);
+  }
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Max-Age', '86400');
+  res.status(204).send();
 });
 
 // POST route to store or update the questionnaire responses
@@ -243,6 +381,31 @@ app.post('/submit', async (req, res) => {
         console.error('Error saving submission:', error);
         res.status(500).send('Error saving submission');
     }
+});
+
+// Preflight handler for submit-master route
+app.options('/submit-master', (req, res) => {
+  console.log('=== Submit Master Preflight ===');
+  const origin = req.get('Origin');
+  if (origin === 'http://localhost:3000') {
+    res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Local submit-master preflight allowed');
+  } else if (origin === 'https://food-security-front.azurewebsites.net') {
+    res.header('Access-Control-Allow-Origin', 'https://food-security-front.azurewebsites.net');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Azure submit-master preflight allowed');
+  } else if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    console.log('✅ Production submit-master preflight allowed');
+  } else {
+    console.log('❌ Submit-master preflight origin not allowed:', origin);
+  }
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Max-Age', '86400');
+  res.status(204).send();
 });
 
 app.post('/submit-master', async (req, res) => {
