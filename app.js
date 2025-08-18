@@ -22,43 +22,6 @@ const allowedOrigins = [
   'https://www.food-security.net'
 ];
 
-// DISABLED CORS - Allow all requests
-// const corsOptions = {
-//   origin: function (origin, callback) {
-//     console.log('CORS check for origin:', origin);
-//     
-//     // Allow requests with no origin (like mobile apps or curl requests)
-//     if (!origin) {
-//       console.log('No origin - allowing');
-//       return callback(null, true);
-//     }
-//     
-//     if (allowedOrigins.includes(origin)) {
-//       console.log('Origin allowed:', origin);
-//       callback(null, true);
-//     } else {
-//       console.log('Origin NOT allowed:', origin);
-//       console.log('Available origins:', allowedOrigins);
-//       callback(new Error(`CORS Error: Origin ${origin} not allowed`));
-//     }
-//   },
-//   credentials: true,
-//   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-//   allowedHeaders: [
-//     'Origin',
-//     'X-Requested-With', 
-//     'Content-Type', 
-//     'Accept',
-//     'Authorization',
-//     'Cache-Control',
-//     'X-Requested-With'
-//   ],
-//   preflightContinue: false,
-//   optionsSuccessStatus: 204
-// };
-
-// app.use(cors(corsOptions));
-
 // CORS configuration for local development and production
 app.use((req, res, next) => {
   const origin = req.get('Origin');
@@ -111,30 +74,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// DISABLED - Explicit OPTIONS handler for all routes
-// app.options('*', (req, res) => {
-//   console.log('=== OPTIONS Request ===');
-//   console.log('Origin:', req.get('Origin'));
-//   console.log('Access-Control-Request-Method:', req.get('Access-Control-Request-Method'));
-//   console.log('Access-Control-Request-Headers:', req.get('Access-Control-Request-Headers'));
-//   console.log('URL:', req.url);
-//   console.log('Method:', req.method);
-//   
-//   const origin = req.get('Origin');
-//   console.log('Checking origin:', origin, 'against allowed origins:', allowedOrigins);
-//   
-//   if (allowedOrigins.includes(origin)) {
-//     console.log('Origin allowed, setting CORS headers');
-//     res.header('Access-Control-Allow-Origin', origin);
-//     res.header('Access-Control-Allow-Credentials', 'true');
-//     res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-//     res.header('Access-Control-Allow-Headers', 'Origin,X-Requested-With,Content-Type,Accept,Authorization,Cache-Control');
-//     res.status(204).send();
-//   } else {
-//     console.log('Origin NOT allowed:', origin);
-//     res.status(403).send('CORS not allowed');
-//   }
-// });
 
 app.use(express.json());
 
