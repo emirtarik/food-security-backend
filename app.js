@@ -113,6 +113,12 @@ app.options('*', (req, res) => {
 
 // Add a simple root route for testing
 app.get('/', (req, res) => {
+  // Ensure CORS headers are present for root route
+  const origin = req.get('Origin');
+  if (allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Credentials', 'true');
+  }
   res.json({ message: 'Backend is running', timestamp: new Date().toISOString() });
 });
 
@@ -120,6 +126,12 @@ app.get('/', (req, res) => {
 app.get('/test-cors', (req, res) => {
   console.log('=== CORS Test Route ===');
   console.log('Origin:', req.get('Origin'));
+  // Ensure CORS headers are present for test route
+  const origin = req.get('Origin');
+  if (allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Credentials', 'true');
+  }
   res.json({ 
     message: 'CORS test successful', 
     timestamp: new Date().toISOString(),
@@ -182,9 +194,21 @@ app.post('/login', async (req, res) => {
 
         if (user && user.password === password) {  // In production, compare hashed passwords
             console.log('Login successful, sending country and role to client');
+            // Ensure CORS headers are present for successful login
+            const origin = req.get('Origin');
+            if (allowedOrigins.includes(origin)) {
+                res.header('Access-Control-Allow-Origin', origin);
+                res.header('Access-Control-Allow-Credentials', 'true');
+            }
             res.status(200).json({ message: 'Login successful', country: user.country, role: user.role });
         } else {
             console.log('Login failed: Invalid credentials');
+            // Ensure CORS headers are present for failed login
+            const origin = req.get('Origin');
+            if (allowedOrigins.includes(origin)) {
+                res.header('Access-Control-Allow-Origin', origin);
+                res.header('Access-Control-Allow-Credentials', 'true');
+            }
             res.status(401).json({ message: 'Invalid credentials' });
         }
     } catch (error) {
@@ -315,6 +339,12 @@ app.post('/submit', async (req, res) => {
         }
 
         console.log(`Submission saved/updated for country: ${country}, role: ${role}, year: ${year}, month: ${month}`);
+        // Ensure CORS headers are present for successful submission
+        const origin = req.get('Origin');
+        if (allowedOrigins.includes(origin)) {
+            res.header('Access-Control-Allow-Origin', origin);
+            res.header('Access-Control-Allow-Credentials', 'true');
+        }
         res.status(200).send('Responses saved/updated in the database');
     } catch (error) {
         console.error('Error saving submission:', error);
@@ -438,6 +468,12 @@ app.post('/submit-master', async (req, res) => {
         }
 
         console.log(`Master submission saved/updated for country: ${country}, role: ${role}, year: ${year}, month: ${month}`);
+        // Ensure CORS headers are present for successful master submission
+        const origin = req.get('Origin');
+        if (allowedOrigins.includes(origin)) {
+            res.header('Access-Control-Allow-Origin', origin);
+            res.header('Access-Control-Allow-Credentials', 'true');
+        }
         res.status(200).send('Master responses saved/updated in the database');
     } catch (error) {
         console.error('Error saving master submission:', error);
@@ -456,6 +492,12 @@ app.get('/available-countries', async (req, res) => {
         `);
   
       const countries = result.recordset.map(row => row.country);
+      // Ensure CORS headers are present for successful response
+      const origin = req.get('Origin');
+      if (allowedOrigins.includes(origin)) {
+          res.header('Access-Control-Allow-Origin', origin);
+          res.header('Access-Control-Allow-Credentials', 'true');
+      }
       res.json(countries);
     } catch (error) {
       console.error('Error fetching available countries:', error);
@@ -482,6 +524,12 @@ app.get('/available-months', async (req, res) => {
       `);
 
     const months = result.recordset.map(row => row.month);
+    // Ensure CORS headers are present for successful response
+    const origin = req.get('Origin');
+    if (allowedOrigins.includes(origin)) {
+        res.header('Access-Control-Allow-Origin', origin);
+        res.header('Access-Control-Allow-Credentials', 'true');
+    }
     res.json(months);
   } catch (error) {
     console.error('Error fetching available months:', error);
@@ -589,8 +637,20 @@ app.get('/responses', async (req, res) => {
 
             console.log('Sending response data:', responseData); // Debugging
 
+            // Ensure CORS headers are present for successful response
+            const origin = req.get('Origin');
+            if (allowedOrigins.includes(origin)) {
+                res.header('Access-Control-Allow-Origin', origin);
+                res.header('Access-Control-Allow-Credentials', 'true');
+            }
             res.json(responseData);
         } else {
+            // Ensure CORS headers are present for empty response
+            const origin = req.get('Origin');
+            if (allowedOrigins.includes(origin)) {
+                res.header('Access-Control-Allow-Origin', origin);
+                res.header('Access-Control-Allow-Credentials', 'true');
+            }
             res.status(200).json({}); // No submission found
         }
     } catch (error) {
@@ -683,9 +743,21 @@ app.get('/master-responses', async (req, res) => {
 
             console.log('Sending back master responses:', aggregatedData);
 
+            // Ensure CORS headers are present for successful response
+            const origin = req.get('Origin');
+            if (allowedOrigins.includes(origin)) {
+                res.header('Access-Control-Allow-Origin', origin);
+                res.header('Access-Control-Allow-Credentials', 'true');
+            }
             res.json(aggregatedData);
         } else {
             console.log(`No submissions found for ${country} - ${year} - ${month}`);
+            // Ensure CORS headers are present for empty response
+            const origin = req.get('Origin');
+            if (allowedOrigins.includes(origin)) {
+                res.header('Access-Control-Allow-Origin', origin);
+                res.header('Access-Control-Allow-Credentials', 'true');
+            }
             res.status(200).json(aggregatedData); // All sections have submitted: false
         }
     } catch (error) {
@@ -755,6 +827,12 @@ app.get('/dashboard-responses', async (req, res) => {
         financingMobilized
       });
 
+      // Ensure CORS headers are present for successful response
+      const origin = req.get('Origin');
+      if (allowedOrigins.includes(origin)) {
+          res.header('Access-Control-Allow-Origin', origin);
+          res.header('Access-Control-Allow-Credentials', 'true');
+      }
       return res.json({
         responses:           cumulativeResponses,
         savedActionPlans:    cumulativeSavedActionPlans,
@@ -767,6 +845,12 @@ app.get('/dashboard-responses', async (req, res) => {
 
     // No submissions found → return empty objects + zeros
     console.log(`No submissions for ${country} - ${year} - ${month}`);
+    // Ensure CORS headers are present for empty response
+    const origin = req.get('Origin');
+    if (allowedOrigins.includes(origin)) {
+        res.header('Access-Control-Allow-Origin', origin);
+        res.header('Access-Control-Allow-Credentials', 'true');
+    }
     return res.status(200).json({
       responses:            {},
       savedActionPlans:     {},
