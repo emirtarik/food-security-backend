@@ -100,6 +100,12 @@ app.use(express.json());
 
 // Add a simple root route for testing
 app.get('/', (req, res) => {
+  // Ensure CORS headers are present for root route
+  const origin = req.get('Origin');
+  if (allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Credentials', 'true');
+  }
   res.json({ message: 'Backend is running', timestamp: new Date().toISOString() });
 });
 
@@ -107,6 +113,12 @@ app.get('/', (req, res) => {
 app.get('/test-cors', (req, res) => {
   console.log('=== CORS Test Route ===');
   console.log('Origin:', req.get('Origin'));
+  // Ensure CORS headers are present for test route
+  const origin = req.get('Origin');
+  if (allowedOrigins.includes(origin)) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Credentials', 'true');
+  }
   res.json({ 
     message: 'CORS test successful', 
     timestamp: new Date().toISOString(),
