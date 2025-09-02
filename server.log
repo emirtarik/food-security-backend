@@ -1,0 +1,170 @@
+Backend is working on port 5001
+=== Incoming Request ===
+GET /
+Origin: undefined
+Headers: {
+  "host": "localhost:5001",
+  "user-agent": "curl/8.7.1",
+  "accept": "*/*"
+}
+=== CORS Request ===
+Method: GET
+Origin: undefined
+URL: /
+✅ No origin request allowed
+=== Incoming Request ===
+OPTIONS /
+Origin: http://localhost:3000
+Headers: {
+  "host": "localhost:5001",
+  "user-agent": "curl/8.7.1",
+  "accept": "*/*",
+  "origin": "http://localhost:3000"
+}
+=== CORS Request ===
+Method: OPTIONS
+Origin: http://localhost:3000
+URL: /
+🔄 Preflight request detected
+✅ Local development preflight allowed
+✅ Preflight response sent
+=== Incoming Request ===
+GET /
+Origin: undefined
+Headers: {
+  "host": "localhost:5001",
+  "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:142.0) Gecko/20100101 Firefox/142.0",
+  "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+  "accept-language": "en-GB,en;q=0.5",
+  "accept-encoding": "gzip, deflate, br, zstd",
+  "connection": "keep-alive",
+  "upgrade-insecure-requests": "1",
+  "sec-fetch-dest": "document",
+  "sec-fetch-mode": "navigate",
+  "sec-fetch-site": "none",
+  "sec-fetch-user": "?1",
+  "priority": "u=0, i"
+}
+=== CORS Request ===
+Method: GET
+Origin: undefined
+URL: /
+✅ No origin request allowed
+=== Incoming Request ===
+GET /favicon.ico
+Origin: undefined
+Headers: {
+  "host": "localhost:5001",
+  "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:142.0) Gecko/20100101 Firefox/142.0",
+  "accept": "image/avif,image/webp,image/png,image/svg+xml,image/*;q=0.8,*/*;q=0.5",
+  "accept-language": "en-GB,en;q=0.5",
+  "accept-encoding": "gzip, deflate, br, zstd",
+  "connection": "keep-alive",
+  "referer": "http://localhost:5001/",
+  "sec-fetch-dest": "image",
+  "sec-fetch-mode": "no-cors",
+  "sec-fetch-site": "cross-site",
+  "priority": "u=6"
+}
+=== CORS Request ===
+Method: GET
+Origin: undefined
+URL: /favicon.ico
+✅ No origin request allowed
+=== Incoming Request ===
+GET /api/health
+Origin: undefined
+Headers: {
+  "host": "localhost:5001",
+  "user-agent": "curl/8.7.1",
+  "accept": "*/*"
+}
+=== CORS Request ===
+Method: GET
+Origin: undefined
+URL: /api/health
+✅ No origin request allowed
+=== Incoming Request ===
+GET /available-countries
+Origin: undefined
+Headers: {
+  "host": "localhost:5001",
+  "user-agent": "curl/8.7.1",
+  "accept": "*/*"
+}
+=== CORS Request ===
+Method: GET
+Origin: undefined
+URL: /available-countries
+✅ No origin request allowed
+=== Incoming Request ===
+GET /test-cors
+Origin: undefined
+Headers: {
+  "host": "localhost:5001",
+  "user-agent": "curl/8.7.1",
+  "accept": "*/*"
+}
+=== CORS Request ===
+Method: GET
+Origin: undefined
+URL: /test-cors
+✅ No origin request allowed
+=== CORS Test Route ===
+Origin: undefined
+=== Incoming Request ===
+OPTIONS /login
+Origin: http://localhost:3000
+Headers: {
+  "host": "localhost:5001",
+  "connection": "keep-alive",
+  "accept": "*/*",
+  "access-control-request-method": "POST",
+  "access-control-request-headers": "content-type",
+  "origin": "http://localhost:3000",
+  "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+  "sec-fetch-mode": "cors",
+  "sec-fetch-site": "same-site",
+  "sec-fetch-dest": "empty",
+  "referer": "http://localhost:3000/",
+  "accept-encoding": "gzip, deflate, br, zstd",
+  "accept-language": "en-US,en;q=0.9,tr;q=0.8"
+}
+=== CORS Request ===
+Method: OPTIONS
+Origin: http://localhost:3000
+URL: /login
+🔄 Preflight request detected
+✅ Local development preflight allowed
+✅ Preflight response sent
+=== Incoming Request ===
+POST /login
+Origin: http://localhost:3000
+Headers: {
+  "host": "localhost:5001",
+  "connection": "keep-alive",
+  "content-length": "46",
+  "sec-ch-ua-platform": "\"macOS\"",
+  "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+  "accept": "application/json, text/plain, */*",
+  "sec-ch-ua": "\"Not;A=Brand\";v=\"99\", \"Google Chrome\";v=\"139\", \"Chromium\";v=\"139\"",
+  "content-type": "application/json",
+  "dnt": "1",
+  "sec-ch-ua-mobile": "?0",
+  "origin": "http://localhost:3000",
+  "sec-fetch-site": "same-site",
+  "sec-fetch-mode": "cors",
+  "sec-fetch-dest": "empty",
+  "referer": "http://localhost:3000/",
+  "accept-encoding": "gzip, deflate, br, zstd",
+  "accept-language": "en-US,en;q=0.9,tr;q=0.8",
+  "cookie": "_ga=GA1.1.1775278519.1742815536; _ga_9BPDFNVSR3=GS2.1.s1756827118$o179$g1$t1756827126$j52$l0$h0"
+}
+=== CORS Request ===
+Method: POST
+Origin: http://localhost:3000
+URL: /login
+✅ Local development origin allowed
+Received login request for username: sn_master and password: password
+User found in database: [object Object]
+Login successful, sending country and role to client
