@@ -1,8 +1,11 @@
-const express = require('express');
-// const cors    = require('cors');
-const sql     = require('mssql');
+import express from 'express';
+import sql from 'mssql';
+import { diagnosticsRouter } from './diagnostics.js';
+
 
 const app = express();
+
+app.use('/_diag', diagnosticsRouter());
 
 // Debug: Log all incoming requests
 app.use((req, res, next) => {
