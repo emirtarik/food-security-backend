@@ -2,6 +2,9 @@
 const express = require('express');
 const sql = require('mssql');
 const { diagnosticsRouter } = require('./diagnostics');
+const fs = require('fs');
+const path = require('path');
+
 
 // Load .env locally (Azure uses App Settings, so this won't run there)
 if (process.env.NODE_ENV !== 'production') {
@@ -102,9 +105,28 @@ app.get('/test-cors', (req, res) => {
   });
 });
 
-// ---- MSSQL config from ENV ----
-// Required App Settings / .env keys:
-//   DB_HOST, DB_PORT=1433, DB_USER, DB_PASS, DB_NAME
+function loadDbCa() {
+  const p = process.env.DB_CA_PEM_PATH
+    ? path.resolve(__dirname, process.env.DB_CA_PEM_PATH) // __dirname-safe
+    : null;
+
+  if (!p || !fs.existsSync(p)) {
+    console.warn('DB_CA_PEM_PATH not set or file not found:', p);
+    return undefined;
+  }
+  try {
+    const pem = fs.readFileSync(p, 'utf8');
+    // quick sanity check: don't print the whole cert, just length
+    console.log('Loaded DB CA PEM, bytes:', Buffer.byteLength(pem, 'utf8'));
+    return pem;
+  } catch (e) {
+    console.error('Failed reading DB CA PEM:', e.message);
+    return undefined;
+  }
+}
+
+const caPem = loadDbCa();
+
 const sqlConfig = {
   server: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT || '1433', 10),
@@ -112,8 +134,13 @@ const sqlConfig = {
   password: process.env.DB_PASS,
   database: process.env.DB_NAME,
   options: {
-    encrypt: true,                // required for RDS public TLS
-    trustServerCertificate: false // keep false in production
+    encrypt: true,
+    // keep strict in prod; allow local toggle only if needed
+    trustServerCertificate: process.env.DB_TRUST_SERVER_CERT === 'true',
+    // give Node the CA so it can build the chain
+    cryptoCredentialsDetails: caPem ? { ca: [caPem] } : undefined,
+    // ensure SNI / hostname check matches
+    serverName: process.env.DB_HOST
   },
   pool: { max: 5, min: 0, idleTimeoutMillis: 30000 }
 };
