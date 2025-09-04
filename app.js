@@ -1,6 +1,6 @@
-import express from 'express';
-import sql from 'mssql';
-import { diagnosticsRouter } from './diagnostics.js';
+const express = require('express');
+const sql = require('mssql');
+const { diagnosticsRouter } = require('./diagnostics');
 
 
 const app = express();
@@ -724,8 +724,9 @@ app.use((err, req, res, next) => {
 });
 
 
-const port = process.env.PORT || 5001;
+const PORT = process.env.PORT || 5001;
+app.listen(PORT, '0.0.0.0', () => console.log(`Server listening on ${PORT}`));
 
-app.listen(port, () => {
-    console.log(`Backend is working on port ${port}`);
-});
+// Optional: catch crashes so they land in logs
+process.on('uncaughtException', err => console.error('UNCAUGHT', err));
+process.on('unhandledRejection', err => console.error('UNHANDLED', err));
