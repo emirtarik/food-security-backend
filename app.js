@@ -144,7 +144,7 @@ const sqlConfig = {
     // ensure SNI / hostname check matches
     serverName: process.env.DB_HOST
   },
-  pool: { max: 5, min: 0, idleTimeoutMillis: 30000 },
+  pool: { max: 5, min: 1, idleTimeoutMillis: 30000 },
 
   connectionTimeout: 8000,
   requestTimeout: 15000,
