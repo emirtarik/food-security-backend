@@ -22,6 +22,16 @@ const app = express();
 // Behind IIS/ARR we need this for secure cookies, proper IPs, etc.
 app.set('trust proxy', 1);
 
+app.use((req, res, next) => {
+  const t0 = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - t0;
+    console.log(`[RT] ${req.method} ${req.originalUrl} -> ${res.statusCode} in ${ms}ms`);
+  });
+  next();
+});
+
+
 // ---- Diagnostics (liveness, env, db) ----
 app.use('/_diag', diagnosticsRouter());
 
