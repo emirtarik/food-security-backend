@@ -5,6 +5,9 @@ const { diagnosticsRouter } = require('./diagnostics');
 const fs = require('fs');
 const cors = require('cors');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
+const bcrypt = require('bcryptjs');
+
 
 
 // Load .env locally (Azure uses App Settings, so this won't run there)
@@ -58,6 +61,15 @@ const corsOptions = {
 app.use(cors(corsOptions));
 // Make sure preflights are handled universally
 app.options('*', cors(corsOptions));
+
+app.use('/login', rateLimit({
+  windowMs: 15*60*1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  // don't count or block preflights
+  skip: (req) => req.method === 'OPTIONS'
+}));
 
 
 app.use(express.json());
@@ -149,36 +161,84 @@ async function getPool() {
 
 // ---- Auth: /login ----
 // NOTE: For production, store hashed passwords and compare with bcrypt.
+
+const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
+const PEPPER = process.env.PASSWORD_PEPPER || '';
+
+// Precompute a dummy hash at startup for timing-equalization when user not found
+const DUMMY_HASH = bcrypt.hashSync('dummy-password', BCRYPT_ROUNDS);
+
 app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ message: 'Missing credentials' });
+  }
 
   console.log(`Received login request for username: ${username}`);
 
   try {
     const pool = await getPool();
+
+    // Fetch only what you need
     const result = await pool
       .request()
       .input('username', sql.VarChar, username)
-      .query('SELECT * FROM Users WHERE username = @username');
+      .query('SELECT country, role, password FROM Users WHERE username = @username');
 
     const user = result.recordset[0];
 
-    if (user && user.password === password) {
-      console.log('Login successful');
-      res.status(200).json({
-        message: 'Login successful',
-        country: user.country,
-        role: user.role
-      });
-    } else {
-      console.log('Login failed: Invalid credentials');
-      res.status(401).json({ message: 'Invalid credentials' });
+    if (!user) {
+      // Do a dummy compare to keep timing similar whether user exists or not
+      await bcrypt.compare(password + PEPPER, DUMMY_HASH);
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
+
+    const stored = user.password || '';
+    const looksBcrypt = /^\$2[aby]\$[0-9]{2}\$/.test(stored);
+
+    let ok = false;
+
+    if (looksBcrypt) {
+      // Normal path: compare against bcrypt hash
+      ok = await bcrypt.compare(password + PEPPER, stored);
+    } else {
+      // Legacy path: DB stored plaintext (or other scheme)
+      ok = stored === password;
+      if (ok) {
+        // Seamless, one-time upgrade to bcrypt
+        const newHash = await bcrypt.hash(password + PEPPER, BCRYPT_ROUNDS);
+        try {
+          await pool
+            .request()
+            .input('username', sql.VarChar, username)
+            .input('hash', sql.VarChar, newHash)
+            .query('UPDATE Users SET password = @hash WHERE username = @username');
+          console.log(`Upgraded password hash for ${username}`);
+        } catch (e) {
+          // If the upgrade fails, still let the login succeed; log the error for later fix
+          console.error('Password upgrade failed:', e);
+        }
+      }
+    }
+
+    if (!ok) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    // Success — return what you already return
+    return res.status(200).json({
+      message: 'Login successful',
+      country: user.country,
+      role: user.role
+    });
+
   } catch (error) {
     console.error('Error during login:', error);
-    res.status(500).json({ message: 'Login failed' });
+    return res.status(500).json({ message: 'Login failed' });
   }
 });
+
+
 
 // ---- Submit (section) ----
 app.post('/submit', async (req, res) => {
@@ -595,3 +655,10 @@ app.listen(PORT, '0.0.0.0', () => console.log(`Server listening on ${PORT}`));
 // Log unhandled errors so they appear in Azure logs
 process.on('uncaughtException', err => console.error('UNCAUGHT', err));
 process.on('unhandledRejection', err => console.error('UNHANDLED', err));
+
+function shutdown(sig){
+  console.log(`\n${sig} received, closing...`);
+  sql.close().catch(()=>{}).finally(()=>process.exit(0));
+}
+['SIGTERM','SIGINT'].forEach(s=>process.on(s,()=>shutdown(s)));
+
