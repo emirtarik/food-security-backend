@@ -107,6 +107,48 @@ app.get('/test-cors', (req, res) => {
   });
 });
 
+// ---- Data download logging ----
+const downloadLogLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.method === 'OPTIONS'
+});
+
+app.post('/download-requests', downloadLogLimiter, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const required = ['email', 'firstName', 'lastName', 'country', 'organisation', 'stakeholder'];
+    for (const k of required) {
+      if (!body[k] || String(body[k]).trim() === '') {
+        return res.status(400).json({ message: `Missing required field: ${k}` });
+      }
+    }
+
+    const pool = await getPool();
+    await pool.request()
+      .input('email', sql.VarChar, body.email)
+      .input('firstName', sql.NVarChar, body.firstName)
+      .input('lastName', sql.NVarChar, body.lastName)
+      .input('country', sql.NVarChar, body.country)
+      .input('organisation', sql.NVarChar, body.organisation)
+      .input('stakeholder', sql.NVarChar, body.stakeholder)
+      .input('usage', sql.NVarChar, body.usage || null)
+      .input('language', sql.VarChar, body.language || null)
+      .input('ipAddress', sql.VarChar, (req.ip || '').toString())
+      .input('userAgent', sql.NVarChar, req.get('user-agent') || null)
+      .query(`INSERT INTO dbo.DataDownloadRequests
+              (email, firstName, lastName, country, organisation, stakeholder, usage, language, ipAddress, userAgent)
+              VALUES (@email, @firstName, @lastName, @country, @organisation, @stakeholder, @usage, @language, @ipAddress, @userAgent)`);
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Error logging download request:', err);
+    return res.status(500).json({ ok: false, message: 'Failed to log download request' });
+  }
+});
+
 function loadDbCa() {
   const p = process.env.DB_CA_PEM_PATH
     ? path.resolve(__dirname, process.env.DB_CA_PEM_PATH) // __dirname-safe
@@ -440,6 +482,7 @@ app.post('/submit-master', async (req, res) => {
   }
 });
 
+
 // ---- Utility lookups ----
 app.get('/available-countries', async (req, res) => {
   try {
@@ -649,6 +692,183 @@ app.get('/dashboard-responses', async (req, res) => {
   } catch (error) {
     console.error('Error fetching dashboard responses:', error);
     return res.status(500).send('Error fetching dashboard responses');
+  }
+});
+
+// ---- Projects CRUD ----
+app.post('/projects', async (req, res) => {
+  try {
+    const body = req.body || {};
+
+    const required = ['country', 'admin1', 'title'];
+    for (const k of required) {
+      if (!body[k] || String(body[k]).trim() === '') {
+        return res.status(400).json({ message: `Missing required field: ${k}` });
+      }
+    }
+
+    const categoriesJson = JSON.stringify(body.categories || {});
+
+    const pool = await getPool();
+    await pool
+      .request()
+      .input('country',            sql.VarChar,        body.country)
+      .input('admin1',             sql.VarChar,        body.admin1)
+      .input('donor',              sql.VarChar,        body.donor || null)
+      .input('title',              sql.NVarChar,       body.title)
+      .input('status',             sql.VarChar,        body.status || null)
+      .input('fundingAgency',      sql.VarChar,        body.fundingAgency || null)
+      .input('implementingAgency', sql.VarChar,        body.implementingAgency || null)
+      .input('recipient',          sql.VarChar,        body.recipient || null)
+      .input('zone',               sql.VarChar,        body.zone || null)
+      .input('start',              sql.Int,            body.start ? parseInt(body.start, 10) : null)
+      .input('end',                sql.Int,            body.end ? parseInt(body.end, 10) : null)
+      .input('currency',           sql.VarChar,        body.currency || null)
+      .input('budget',             sql.Decimal(18,2),  body.budget !== undefined && body.budget !== null && body.budget !== '' ? Number(body.budget) : null)
+      .input('budgetUSD',          sql.Decimal(18,2),  body.budgetUSD !== undefined && body.budgetUSD !== null && body.budgetUSD !== '' ? Number(body.budgetUSD) : null)
+      .input('link',               sql.NVarChar,       body.link || null)
+      .input('img',                sql.NVarChar,       body.img || null)
+      .input('comments',           sql.NVarChar,       body.comments || null)
+      .input('topic',              sql.NVarChar,       body.topic || null)
+      .input('categoriesJson',     sql.NVarChar,       categoriesJson)
+      .input('createdBy',          sql.VarChar,        body.createdBy || null)
+      .query(`
+        INSERT INTO dbo.Projects (
+          country, admin1, donor, title, status, fundingAgency, implementingAgency, recipient, zone,
+          [start], [end], currency, budget, budgetUSD, [link], img, comments, topic, categoriesJson, createdBy
+        ) VALUES (
+          @country, @admin1, @donor, @title, @status, @fundingAgency, @implementingAgency, @recipient, @zone,
+          @start, @end, @currency, @budget, @budgetUSD, @link, @img, @comments, @topic, @categoriesJson, @createdBy
+        );
+      `);
+
+    return res.status(201).json({ message: 'Project created' });
+  } catch (err) {
+    console.error('Error creating project:', err);
+    return res.status(500).json({ message: 'Error creating project' });
+  }
+});
+
+// Update project categories (merge with existing; locked trues stay true)
+app.put('/projects/:id', async (req, res) => {
+  const { id } = req.params;
+  const body = req.body || {};
+  const userCats = body.categories || {};
+  if (!id) return res.status(400).json({ message: 'Missing id' });
+
+  try {
+    const pool = await getPool();
+    // fetch existing categoriesJson
+    const current = await pool
+      .request()
+      .input('id', sql.Int, parseInt(id, 10))
+      .query('SELECT categoriesJson FROM dbo.Projects WHERE id = @id');
+
+    if (current.recordset.length === 0) {
+      return res.status(404).json({ message: 'Not found' });
+    }
+
+    const raw = current.recordset[0].categoriesJson;
+    let baseCats = {};
+    try { baseCats = raw ? JSON.parse(raw) : {}; } catch { baseCats = {}; }
+
+    // merge: locked trues preserved; otherwise take user value (default false)
+    const labels = new Set([
+      ...Object.keys(baseCats || {}),
+      ...Object.keys(userCats || {})
+    ]);
+    const merged = {};
+    labels.forEach(label => {
+      merged[label] = baseCats[label] === true ? true : !!userCats[label];
+    });
+
+    await pool
+      .request()
+      .input('id', sql.Int, parseInt(id, 10))
+      .input('categoriesJson', sql.NVarChar, JSON.stringify(merged))
+      .query('UPDATE dbo.Projects SET categoriesJson = @categoriesJson WHERE id = @id');
+
+    return res.status(200).json({ id: parseInt(id, 10), categoriesJson: merged });
+  } catch (err) {
+    console.error('Error updating project categories:', err);
+    return res.status(500).json({ message: 'Error updating project' });
+  }
+});
+
+// Quick verification endpoint (optional)
+app.get('/projects', async (req, res) => {
+  const { country, admin1 } = req.query;
+  try {
+    const pool = await getPool();
+    const request = pool.request();
+    if (country) request.input('country', sql.VarChar, country);
+    if (admin1) request.input('admin1', sql.VarChar, admin1);
+    const where = [
+      country ? 'country = @country' : null,
+      admin1 ? 'admin1 = @admin1' : null
+    ].filter(Boolean).join(' AND ');
+    const sqlText = `SELECT TOP 50 id, country, admin1, title, status, categoriesJson, createdAt, createdBy FROM dbo.Projects ${where ? 'WHERE ' + where : ''} ORDER BY id DESC`;
+    const result = await request.query(sqlText);
+    res.json(result.recordset);
+  } catch (err) {
+    console.error('Error fetching projects:', err);
+    res.status(500).json({ message: 'Error fetching projects' });
+  }
+});
+
+// Mirror under /api for proxies that prefix API routes
+// (removed test diagnostics and mirror routes)
+// ---- Projects CRUD ----
+app.post('/projects', async (req, res) => {
+  try {
+    const body = req.body || {};
+
+    const required = ['country', 'admin1', 'title'];
+    for (const k of required) {
+      if (!body[k] || String(body[k]).trim() === '') {
+        return res.status(400).json({ message: `Missing required field: ${k}` });
+      }
+    }
+
+    const categoriesJson = JSON.stringify(body.categories || {});
+
+    const pool = await getPool();
+    await pool
+      .request()
+      .input('country',            sql.VarChar,        body.country)
+      .input('admin1',             sql.VarChar,        body.admin1)
+      .input('donor',              sql.VarChar,        body.donor || null)
+      .input('title',              sql.NVarChar,       body.title)
+      .input('status',             sql.VarChar,        body.status || null)
+      .input('fundingAgency',      sql.VarChar,        body.fundingAgency || null)
+      .input('implementingAgency', sql.VarChar,        body.implementingAgency || null)
+      .input('recipient',          sql.VarChar,        body.recipient || null)
+      .input('zone',               sql.VarChar,        body.zone || null)
+      .input('start',              sql.Int,            body.start ? parseInt(body.start, 10) : null)
+      .input('end',                sql.Int,            body.end ? parseInt(body.end, 10) : null)
+      .input('currency',           sql.VarChar,        body.currency || null)
+      .input('budget',             sql.Decimal(18,2),  body.budget !== undefined && body.budget !== null && body.budget !== '' ? Number(body.budget) : null)
+      .input('budgetUSD',          sql.Decimal(18,2),  body.budgetUSD !== undefined && body.budgetUSD !== null && body.budgetUSD !== '' ? Number(body.budgetUSD) : null)
+      .input('link',               sql.NVarChar,       body.link || null)
+      .input('img',                sql.NVarChar,       body.img || null)
+      .input('comments',           sql.NVarChar,       body.comments || null)
+      .input('topic',              sql.NVarChar,       body.topic || null)
+      .input('categoriesJson',     sql.NVarChar,       categoriesJson)
+      .input('createdBy',          sql.VarChar,        body.createdBy || null)
+      .query(`
+        INSERT INTO dbo.Projects (
+          country, admin1, donor, title, status, fundingAgency, implementingAgency, recipient, zone,
+          [start], [end], currency, budget, budgetUSD, [link], img, comments, topic, categoriesJson, createdBy
+        ) VALUES (
+          @country, @admin1, @donor, @title, @status, @fundingAgency, @implementingAgency, @recipient, @zone,
+          @start, @end, @currency, @budget, @budgetUSD, @link, @img, @comments, @topic, @categoriesJson, @createdBy
+        );
+      `);
+
+    return res.status(201).json({ message: 'Project created' });
+  } catch (err) {
+    console.error('Error creating project:', err);
+    return res.status(500).json({ message: 'Error creating project' });
   }
 });
 
